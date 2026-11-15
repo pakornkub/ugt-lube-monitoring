@@ -27,7 +27,7 @@ export const mailEn = {
       'Sent when a user clicks "Forgot password" — the link is single-use and expires per resetPasswordTokenExpiresIn in lib/auth.ts',
     userWithoutRoleLabel: 'Admins: someone signed in without a role',
     userWithoutRoleDescription:
-      'Sent to everyone holding users:update when an SSO/AD user signs in for the first time with no role · once per user',
+      'Sent to everyone holding users:manage when an SSO/AD user signs in for the first time with no role · once per user',
   },
   page: {
     title: 'Email templates',

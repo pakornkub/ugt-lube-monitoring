@@ -19,7 +19,7 @@ export async function logAudit(opts: {
         userId: user?.id ?? 'system',
         action: opts.action,
         tableName: opts.table_name,
-        recordId: opts.record_id ?? null,
+        recordId: opts.record_id?.slice(0, 200) ?? null, // RecordId is NVarChar(200)
         oldValue: opts.old_value ? JSON.stringify(opts.old_value) : null,
         newValue: opts.new_value ? JSON.stringify(opts.new_value) : null,
       },

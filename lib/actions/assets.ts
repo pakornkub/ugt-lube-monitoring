@@ -11,6 +11,7 @@ import { getAllAssets } from '@/lib/queries/assets';
 import { getSiteScope, siteWhere } from '@/lib/queries/permissions';
 import { computeHealth, recomputeAllHealth } from '@/lib/scoring/recompute';
 import type { Asset } from '@/lib/types';
+import { readingFileKeys, removeStoredFiles } from '@/lib/attachments-server';
 
 // The only columns a user may write. health/status are the Health Score cache
 // (iron rule) and must never come from the client — the TS types below are
@@ -142,8 +143,11 @@ export async function deleteAsset(id: string): Promise<ActionResult> {
   return runAction(async () => {
     const auth = await requirePermission('assets:delete');
     if (!auth.ok) return auth.error;
-    const { count } = await prisma.asset.deleteMany({ where: { id, ...(await siteWhere()) } });
+    const where = { id, ...(await siteWhere()) };
+    const files = await readingFileKeys(where);
+    const { count } = await prisma.asset.deleteMany({ where });
     if (!count) return { ok: false, message: OUT_OF_SCOPE };
+    await removeStoredFiles(files);
     await logAudit({ action: 'DELETE', table_name: 'assets', record_id: id });
     revalidatePath('/assets');
     revalidatePath('/dashboard');
@@ -158,8 +162,15 @@ export async function deleteAssets(ids: string[]): Promise<ActionResult> {
     const where = { id: { in: ids }, ...(await siteWhere()) };
     const gone = (await prisma.asset.findMany({ where, select: { id: true } })).map((r) => r.id);
     if (!gone.length) return { ok: false, message: OUT_OF_SCOPE };
+    const files = await readingFileKeys({ id: { in: gone } });
     await prisma.asset.deleteMany({ where: { id: { in: gone } } });
-    await logAudit({ action: 'DELETE', table_name: 'assets', record_id: gone.join(',') });
+    await removeStoredFiles(files);
+    await logAudit({
+      action: 'DELETE',
+      table_name: 'assets',
+      record_id: `${gone.length} assets`,
+      old_value: { ids: gone },
+    });
     revalidatePath('/assets');
     revalidatePath('/dashboard');
     const skipped = ids.length - gone.length;
@@ -178,7 +189,10 @@ export async function deleteAllAssets(): Promise<ActionResult> {
     const auth = await requirePermission('assets:delete_all');
     if (!auth.ok) return auth.error;
     // still limited to the user's plants, as the RLS delete policy was
-    await prisma.asset.deleteMany({ where: await siteWhere() });
+    const scope = await siteWhere();
+    const files = await readingFileKeys(scope);
+    await prisma.asset.deleteMany({ where: scope });
+    await removeStoredFiles(files);
     await logAudit({ action: 'DELETE', table_name: 'assets', record_id: '__all__' });
     revalidatePath('/assets');
     revalidatePath('/dashboard');
@@ -238,7 +252,9 @@ export async function importAssets(items: Asset[]): Promise<ActionResult> {
     // one transaction: the whole file lands or none of it does (as the single upsert did)
     await prisma.$transaction(
       rows.map(({ install_date, ...r }) => {
-        const data = { ...r, ...(install_date ? { install_date: toDate(install_date) } : {}) };
+        // an unreadable date leaves the saved one alone instead of writing NULL over it
+        const date = toDate(install_date);
+        const data = { ...r, ...(date ? { install_date: date } : {}) };
         return prisma.asset.upsert({
           where: { id: r.id },
           update: { ...data, updated_by: auth.userId },
@@ -251,8 +267,8 @@ export async function importAssets(items: Asset[]): Promise<ActionResult> {
     await logAudit({
       action: 'INSERT',
       table_name: 'assets',
-      record_id: rows.map((r) => r.id).join(','),
-      new_value: { count: rows.length },
+      record_id: `${rows.length} assets`,
+      new_value: { count: rows.length, ids: rows.map((r) => r.id) },
     });
     revalidatePath('/assets');
     revalidatePath('/dashboard');

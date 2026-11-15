@@ -203,7 +203,7 @@ export function composeEmail(def: MailTemplateDefinition, contentHtml: string): 
 // ─── Default templates (editable content only) ───────────────────────────────
 
 export const DEFAULT_MAIL_TEMPLATES: Record<MailTemplateKey, MailTemplate> = {
-  // ส่งจาก lib/after-login.ts ถึงทุกคนที่ถือ users:update — ปุ่มไปแท็บ "ยังไม่มีบทบาท" เป็น chrome
+  // ส่งจาก lib/after-login.ts ถึงทุกคนที่ถือ users:manage — ปุ่มไปแท็บ "ยังไม่มีบทบาท" เป็น chrome
   'auth.user-without-role': {
     subject: '[{{appName}}] {{userName}} เข้าระบบแล้วแต่ยังไม่มีบทบาท',
     html: [

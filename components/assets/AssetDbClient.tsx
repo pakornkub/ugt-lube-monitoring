@@ -406,7 +406,7 @@ export function AssetDbClient({
             }))}
           />
           {/* an on/off toggle, so a standalone button sized like the bars beside it */}
-          <a
+          <Link
             href={siteHref(site, q, status, sort ? '' : 'health_asc')}
             aria-current={sort ? 'true' : undefined}
             className={
@@ -418,7 +418,7 @@ export function AssetDbClient({
           >
             <ArrowUpDown className="h-3.5 w-3.5" aria-hidden />
             เรียงคะแนนน้อย→มาก
-          </a>
+          </Link>
         </div>
 
         <form method="get" action="/assets" className="flex flex-wrap items-center gap-2">

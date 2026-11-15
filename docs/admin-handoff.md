@@ -33,7 +33,7 @@
 | Login prod | prod | `ugt-lube-monitoring_app` | ใน `UGT_LubeMonitoring`: `db_datareader` · `db_datawriter` · `db_ddladmin` · `GRANT EXECUTE` |
 | Login dev | dev | `ugt-lube-monitoring_dev` | ใน `UGT_LubeMonitoring_Dev`: เหมือน login prod · ใน `UGT_LubeMonitoring_Dev_shadow`: `db_owner` |
 
-> ตารางสร้างเองตอน deploy (pipeline รัน migration) — DBA ไม่ต้องสร้างตาราง
+> ตารางสร้างเองตอน deploy (pipeline รัน migration) — DBA ไม่ต้องสร้างตาราง · database ทั้ง 3 ใช้ collation แบบไม่แยกตัวพิมพ์ใหญ่-เล็ก เช่น `Thai_CI_AS` (ระบบค้นหาเครื่องจักรอาศัยค่านี้) · SQL Server 2017 ขึ้นไป (ทดสอบ migration แล้วบน 2019)
 
 
 ### B. Server — Folder เก็บไฟล์

@@ -10,6 +10,7 @@ import { BiLabel } from '@/components/ui/primitives';
 import { sectionsFor, type NavItem } from '@/lib/nav';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { LogoutButton } from '@/components/layout/LogoutButton';
+import { withBase } from '@/lib/base-path';
 import type { Profile, Role } from '@/lib/types';
 
 const STORAGE_KEY = 'sidebar-collapsed';
@@ -79,7 +80,7 @@ export function Sidebar({
         <div className="flex items-center gap-1.5 max-[760px]:justify-center">
           <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[7px] max-[760px]:h-[30px] max-[760px]:w-[30px]">
             <Image
-              src="/logo.svg"
+              src={withBase('/logo.svg')}
               alt="UBE logo"
               width={40}
               height={40}

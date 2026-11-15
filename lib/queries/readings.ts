@@ -80,7 +80,8 @@ export async function getLatestReadingsMany(
 
 /**
  * Each machine's latest lab (oil) period, or no entry when it has none yet. assets.last_update
- * is not this: it holds the month the machine was added and saving a reading never moves it.
+ * is not this: it starts at the equipment list's date and only moves forward to the newest
+ * oil or vibration reading (lib/scoring/recompute.ts).
  */
 export async function getLatestLabPeriods(
   assetIds: string[],

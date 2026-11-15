@@ -1,4 +1,5 @@
 import 'server-only';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getDeductionBreakdown } from '@/lib/scoring/audit';
 import { statusFromHealth } from '@/lib/scoring/health';
@@ -37,31 +38,35 @@ async function loadGlobals(): Promise<{ params: AlarmParam[]; cfg: ScoreConfig }
   };
 }
 
-async function scoreAsset(
-  assetId: string,
-  g: { params: AlarmParam[]; cfg: ScoreConfig }
-): Promise<number | null> {
-  const asset = await prisma.asset.findUnique({
-    where: { id: assetId },
-    select: {
-      vg_grade: true,
-      alarmOverrides: true,
-      scoreOverride: true,
-      // latest = newest period, then newest row (same order compute_health used)
-      oil_readings: {
-        select: OIL_SELECT,
-        orderBy: [{ period: 'desc' }, { created_at: 'desc' }],
-        take: 1,
-      },
-      vib_readings: {
-        select: VIB_SELECT,
-        orderBy: [{ period: 'desc' }, { created_at: 'desc' }],
-        take: 1,
-      },
-    },
-  });
-  if (!asset) return null;
+// Everything the formula needs for one machine — one shape for the single and the bulk path.
+const ASSET_SCORE_SELECT = {
+  id: true,
+  health: true,
+  last_update: true,
+  vg_grade: true,
+  alarmOverrides: true,
+  scoreOverride: true,
+  // latest = newest period, then newest row (same order compute_health used)
+  oil_readings: {
+    select: OIL_SELECT,
+    orderBy: [{ period: 'desc' }, { created_at: 'desc' }],
+    take: 1,
+  },
+  vib_readings: {
+    select: VIB_SELECT,
+    orderBy: [{ period: 'desc' }, { created_at: 'desc' }],
+    take: 1,
+  },
+} satisfies Prisma.assetSelect;
 
+type ScoreRow = NonNullable<Awaited<ReturnType<typeof loadRow>>>;
+type Scored = { health: number; lastUpdate: string | null };
+
+function loadRow(assetId: string) {
+  return prisma.asset.findUnique({ where: { id: assetId }, select: ASSET_SCORE_SELECT });
+}
+
+function scoreRow(asset: ScoreRow, g: { params: AlarmParam[]; cfg: ScoreConfig }): Scored {
   const params = asset.alarmOverrides.length
     ? g.params.map((p) => {
         const ov = asset.alarmOverrides.find((o) => o.category === p.category && o.key === p.key);
@@ -88,28 +93,51 @@ async function scoreAsset(
 
   const oil = (asset.oil_readings[0] ?? null) as OilReading | null;
   const vib = (asset.vib_readings[0] ?? null) as VibReading | null;
-  return getDeductionBreakdown(oil, vib, params, cfg, asset.vg_grade).netScore;
-}
-
-async function store(assetId: string, health: number): Promise<void> {
-  await prisma.asset.update({
-    where: { id: assetId },
-    data: { health, status: statusFromHealth(health) },
-  });
+  const health = getDeductionBreakdown(oil, vib, params, cfg, asset.vg_grade).netScore;
+  // "Last update" only moves forward: a newer reading advances it, deleting one never
+  // pulls it back below the equipment list's own date (what the app always showed).
+  const lastUpdate =
+    [asset.last_update, oil?.period, vib?.period]
+      .filter((p): p is string => !!p)
+      .sort()
+      .pop() ?? null;
+  return { health, lastUpdate };
 }
 
 /** Recompute one machine's Health Score and cache it on the asset row. */
 export async function computeHealth(assetId: string): Promise<void> {
-  const health = await scoreAsset(assetId, await loadGlobals());
-  if (health != null) await store(assetId, health);
+  const row = await loadRow(assetId);
+  if (!row) return;
+  const r = scoreRow(row, await loadGlobals());
+  await prisma.asset.update({
+    where: { id: assetId },
+    data: { health: r.health, status: statusFromHealth(r.health), last_update: r.lastUpdate },
+  });
 }
 
-/** Recompute every machine (after thresholds / score_config change). */
+/** Recompute every machine (after thresholds / score_config change): one read for the
+ *  fleet, then one updateMany per distinct score — a handful of round trips, not ~3 per machine. */
 export async function recomputeAllHealth(): Promise<void> {
   const g = await loadGlobals();
-  const ids = await prisma.asset.findMany({ select: { id: true, health: true } });
-  for (const { id, health: old } of ids) {
-    const health = await scoreAsset(id, g);
-    if (health != null && health !== old) await store(id, health);
+  const rows = await prisma.asset.findMany({ select: ASSET_SCORE_SELECT });
+  const byHealth = new Map<number, string[]>();
+  const moved: { id: string; lastUpdate: string | null }[] = [];
+  for (const row of rows) {
+    const r = scoreRow(row, g);
+    if (r.health !== row.health)
+      byHealth.set(r.health, [...(byHealth.get(r.health) ?? []), row.id]);
+    if (r.lastUpdate !== row.last_update) moved.push({ id: row.id, lastUpdate: r.lastUpdate });
+  }
+  const CHUNK = 1000; // SQL Server allows 2100 parameters per statement
+  for (const [health, ids] of byHealth) {
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      await prisma.asset.updateMany({
+        where: { id: { in: ids.slice(i, i + CHUNK) } },
+        data: { health, status: statusFromHealth(health) },
+      });
+    }
+  }
+  for (const m of moved) {
+    await prisma.asset.update({ where: { id: m.id }, data: { last_update: m.lastUpdate } });
   }
 }

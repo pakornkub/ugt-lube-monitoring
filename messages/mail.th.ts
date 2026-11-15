@@ -30,7 +30,7 @@ export const mailTh = {
       'ส่งเมื่อผู้ใช้กด "ลืมรหัสผ่าน" · ลิงก์ใช้ได้ครั้งเดียวและหมดอายุตาม resetPasswordTokenExpiresIn ใน lib/auth.ts',
     userWithoutRoleLabel: 'แจ้งแอดมิน: มีคนเข้าระบบแต่ยังไม่มีบทบาท',
     userWithoutRoleDescription:
-      'ส่งถึงทุกคนที่มีสิทธิ์ users:update เมื่อผู้ใช้ SSO/AD เข้าระบบครั้งแรกโดยยังไม่มีบทบาท · ครั้งเดียวต่อคน',
+      'ส่งถึงทุกคนที่มีสิทธิ์ users:manage เมื่อผู้ใช้ SSO/AD เข้าระบบครั้งแรกโดยยังไม่มีบทบาท · ครั้งเดียวต่อคน',
   },
   page: {
     title: 'เทมเพลตอีเมล',

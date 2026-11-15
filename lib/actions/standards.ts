@@ -8,6 +8,7 @@ import { requirePermission } from './guards';
 import { logAudit } from './audit-log';
 import { listStandards } from '@/lib/queries/standards';
 import type { Standard, StandardCategory } from '@/lib/types';
+import { removeStoredFiles, standardFileKeys } from '@/lib/attachments-server';
 
 type StandardInput = {
   title: string;
@@ -88,9 +89,11 @@ export async function deleteStandard(id: string): Promise<ActionResult> {
   return runAction(async () => {
     const auth = await requirePermission('standards:write');
     if (!auth.ok) return auth.error;
-    // its attachment rows cascade; the bytes are removed by the retention sweep's orphan-file step
+    // its attachment rows cascade; remove their files right away (not left for the sweep)
+    const files = await standardFileKeys(id);
     const { count } = await prisma.standard.deleteMany({ where: { id } });
     if (!count) return { ok: false, message: 'ไม่พบรายการนี้ หรือไม่มีสิทธิ์แก้ไขรายการของโรงงานนี้' };
+    await removeStoredFiles(files);
     await logAudit({ action: 'DELETE', table_name: 'standards', record_id: id });
     revalidatePath('/standards');
     return { ok: true, message: 'ลบมาตรฐานแล้ว' };

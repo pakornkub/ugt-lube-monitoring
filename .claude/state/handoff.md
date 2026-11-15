@@ -9,17 +9,16 @@ Last updated: 2026-11-15
 
 ## In progress
 
-- Org-standard migration done in code, **not yet run against a real SQL Server or Keycloak** —
-  no DB/IdP reachable during the install (no Docker locally).
+- Nothing in progress — the code side is done, committed to pakornkub/ugt-lube-monitoring#1 (branch
+  `org-standard-setup`). Waiting on the admin team (`docs/admin-handoff.md`). The LocalDB smoke DBs are
+  dropped and `.env.local` is back to `CHANGE_ME` for the DB.
 
-## Next
+## Next (all wait on the admin team)
 
-- Forward `docs/admin-handoff.md` to the admin team; put the returned values in `.env.local`
-  (DATABASE_URL, SHADOW_DATABASE_URL, BETTER_AUTH_SECRET/URL, KEYCLOAK_*, SMTP_*, CRON_SECRET)
-- First run on a real DB: `npx prisma migrate deploy` (0_init, written offline) → `npx prisma db seed`
-  (569 machines + reference data) → log in → `/admin/setup` claims Administrator
-- Smoke-test every page against the real DB (only type-checked + unit-tested so far)
-- Push `develop` → Jenkins runs the 10 stages
+- Admin team returns the values in `docs/admin-handoff.md` → put them in `.env.local` → full system test on the
+  real dev DB + Keycloak + SMTP (`/ugt-nextjs-system-test` live mode once that skill ships). Never tested here:
+  real SSO login, SMTP delivery, Jenkins/Docker deploy
+- Jenkins/SonarQube job ready → push `develop` → 10 stages green → merge PR #1
 
 ## Open Questions
 
@@ -30,6 +29,9 @@ Last updated: 2026-11-15
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
 
+- 2026-11-15 Smoke test on SQL Server LocalDB + fixes: sidebar logo and sort link under basePath, "Last update" moves
+  forward with new readings, batched recompute-all (6.4 s → 0.4 s), audit RecordId length, import keeps install date,
+  files removed with their machine/standard, maintenance order, collation note in admin handoff
 - 2026-11-15 `/ugt-nextjs-full-setup` (preserve mode): Next 16 / React 19 / Tailwind v4 ·
   Supabase → Prisma + SQL Server (Demo Mode + Local Store removed) · Better Auth SSO (Keycloak) +
   existing RBAC · shadcn base-mira kit + Inter/Noto Sans Thai · SMTP mail · attachments on a

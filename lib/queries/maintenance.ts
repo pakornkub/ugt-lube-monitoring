@@ -17,7 +17,8 @@ export async function listMaintenance(assetId: string): Promise<MaintenanceRecor
       cost: true,
       technician: true,
     },
-    orderBy: { work_date: 'desc' },
+    // NULL dates first, as Postgres sorted them (SQL Server puts NULLs last on DESC)
+    orderBy: [{ work_date: { sort: 'desc', nulls: 'first' } }, { created_at: 'desc' }],
   });
   return rows.map((r) => ({
     ...r,

@@ -5,6 +5,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const state = vi.hoisted(() => ({
   asset: null as Record<string, unknown> | null,
   saved: null as unknown,
+  fleet: [] as Record<string, unknown>[],
+  updateMany: [] as unknown[],
+  updates: [] as unknown[],
 }));
 
 vi.mock('server-only', () => ({}));
@@ -36,15 +39,22 @@ vi.mock('@/lib/prisma', () => ({
     },
     asset: {
       findUnique: async () => state.asset,
-      update: async (args: unknown) => (state.saved = args),
+      findMany: async () => state.fleet,
+      update: async (args: unknown) => {
+        state.saved = args;
+        state.updates.push(args);
+      },
+      updateMany: async (args: unknown) => state.updateMany.push(args),
     },
   },
 }));
 
-import { computeHealth } from './recompute';
+import { computeHealth, recomputeAllHealth } from './recompute';
 
 beforeEach(() => {
   state.saved = null;
+  state.updateMany = [];
+  state.updates = [];
 });
 
 describe('computeHealth', () => {
@@ -57,7 +67,10 @@ describe('computeHealth', () => {
       vib_readings: [],
     };
     await computeHealth('A-1');
-    expect(state.saved).toEqual({ where: { id: 'A-1' }, data: { health: 75, status: 'Warning' } });
+    expect(state.saved).toEqual({
+      where: { id: 'A-1' },
+      data: { health: 75, status: 'Warning', last_update: '2026-10' },
+    });
   });
 
   it('applies a per-asset limit override', async () => {
@@ -78,18 +91,47 @@ describe('computeHealth', () => {
       vib_readings: [],
     };
     await computeHealth('A-1');
-    expect(state.saved).toEqual({ where: { id: 'A-1' }, data: { health: 100, status: 'Healthy' } });
+    expect(state.saved).toEqual({
+      where: { id: 'A-1' },
+      data: { health: 100, status: 'Healthy', last_update: '2026-10' },
+    });
   });
 
   it('no readings → 100 / Healthy', async () => {
     state.asset = {
       vg_grade: 46,
+      last_update: '2026-07',
       alarmOverrides: [],
       scoreOverride: null,
       oil_readings: [],
       vib_readings: [],
     };
     await computeHealth('A-1');
-    expect(state.saved).toEqual({ where: { id: 'A-1' }, data: { health: 100, status: 'Healthy' } });
+    expect(state.saved).toEqual({
+      where: { id: 'A-1' },
+      data: { health: 100, status: 'Healthy', last_update: '2026-07' },
+    });
+  });
+});
+
+describe('recomputeAllHealth', () => {
+  const row = (id: string, health: number, tan?: number) => ({
+    id,
+    health,
+    last_update: '2026-11',
+    vg_grade: 46,
+    alarmOverrides: [],
+    scoreOverride: null,
+    oil_readings: tan == null ? [] : [{ period: '2026-11', tan }],
+    vib_readings: [],
+  });
+
+  it('writes only machines whose score changed, grouped by score', async () => {
+    state.fleet = [row('A', 100), row('B', 100, 2), row('C', 100, 2), row('D', 75, 2)];
+    await recomputeAllHealth();
+    expect(state.updateMany).toEqual([
+      { where: { id: { in: ['B', 'C'] } }, data: { health: 75, status: 'Warning' } },
+    ]);
+    expect(state.updates).toEqual([]);
   });
 });
