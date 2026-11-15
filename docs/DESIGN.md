@@ -471,7 +471,7 @@ backdrop-blur-md`) · ขวา = ฟอร์มบน `bg-background` · **ม
 | grandfather: ตาราง `<table>` เขียนเอง 13 จุด (Dashboard, Asset DB, Drill-down, Reports, Users, Audit) ไม่ใช่ DataTable | grandfather — UX ตาราง (sort/paging ผ่าน URL) คงเดิม; หน้าใหม่ใช้ DataTable | 2026-11-15 |
 | grandfather: control ฟอร์มเดิม (input/select ธรรมดา + class เดิม) ในหน้าจอเดิม                                          | grandfather — สเกลเท่ากับ kit ที่ rebase แล้ว จึงอยู่ร่วมกันได้                   | 2026-11-15 |
 | grandfather: format วันที่ inline (`toLocale*` 8 ไฟล์)                                                                 | grandfather — ใช้ `lib/format.ts` ในโค้ดใหม่                              | 2026-11-15 |
-| grandfather: ป้ายงวดผลแล็บแสดงปี พ.ศ. (`formatPeriodTh` → "ต.ค. 69") — มาตรฐานองค์กรให้ ค.ศ. | grandfather (preserve UI) — รอเจ้าของโปรเจคตัดสิน (handoff Open Questions) | 2026-11-15 |
+| grandfather: ป้ายงวดผลแล็บแสดงปี พ.ศ. (`formatPeriodTh` → "ต.ค. 69") — มาตรฐานองค์กรให้ ค.ศ. | grandfather ถาวร — เจ้าของโปรเจคเลือกคง พ.ศ. (§10 2026-11-16) | 2026-11-16 |
 | grandfather: กราฟใช้ Chart.js (ไม่ใช่ shadcn chart/recharts)                                                          | grandfather — สีกราฟ + logic เดิมจาก prototype                           | 2026-11-15 |
 | หน้า login ของโปรเจคเอง (การ์ดมืด gradient) แทน `LoginShell` ของ kit                                                  | คงหน้าตาเดิม เปลี่ยนแค่ปุ่มเป็น SSO                                            | 2026-11-15 |     |     |
 
@@ -487,3 +487,4 @@ backdrop-blur-md`) · ขวา = ฟอร์มบน `bg-background` · **ม
 | 2026-11-15 | ปุ่มของแอป (`Button`/`ButtonLink` ใน `primitives.tsx`) map ไป kit: primary→`default` (สีทึบ #0066cc แทน gradient เดิม) · ghost→`outline` · danger→outline แดง (ปฏิเสธ) · ok→`success` · critical→`destructive` · ขนาด md/sm/xs → default/sm/xs ที่ rebase เป็นทรง pill 36/32/28px | components ตาม plugin โดยคงขนาด/ทรงเดิม |
 | 2026-11-15 | radius ของแอปคงสเกล Tailwind เดิม (sm 4 · md 6 · lg 8 · xl 12 · 2xl 16) แทน 7.2/14 ของ kit · Modal + การ์ด login จาก 16px → 12px (`rounded-xl`) ให้อยู่ใน 4 บทบาท | ยึดของเดิม — มุมเดิมทั้งแอปไม่ขยับ |
 | 2026-11-15 | Topbar z-index 500 → 40 เพื่อให้ overlay ของ kit (Dialog/Sheet z-50) คลุมทั้งจอ | Modal ย้ายไป kit Dialog |
+| 2026-11-16 | ป้ายงวดผลแล็บคงปี พ.ศ. (`formatPeriodTh` → "ต.ค. 69") — ยกเว้นจาก iron rule ค.ศ. เฉพาะป้ายนี้; วันที่อื่นทั้งหมดยังเป็น ค.ศ. ตาม `lib/format.ts` | เจ้าของโปรเจค: "ป้ายปีคง พ.ศ. ไว้" |

@@ -1,6 +1,6 @@
 # Handoff
 
-Last updated: 2026-11-15
+Last updated: 2026-11-16
 
 <!-- ของสด: งานถึงไหน คิวอะไรต่อ ติดคำถามอะไร — โหลดเข้า context ทุก session ผ่าน
      CLAUDE.md import · อัปเดตผ่าน /ugt-handoff ตอนจบทุก work chunk แล้ว commit
@@ -22,13 +22,11 @@ Last updated: 2026-11-15
 
 ## Open Questions
 
-- Weekly digest time: Vercel ran it Monday 06:00 UTC; the handoff crontab uses 13:00 Bangkok
-  (same instant). Confirm or move to 06:00 Bangkok. — owner: project owner
-- Lab period labels still show the Buddhist year (`ต.ค. 69`); the org design contract says ค.ศ.
-  Grandfathered in DESIGN.md §9 — decide whether to switch. — owner: project owner
+- (none)
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
 
+- 2026-11-16 Owner decisions: weekly digest stays Monday 13:00 Bangkok; lab period labels keep the Buddhist year (DESIGN.md §10)
 - 2026-11-15 Smoke test on SQL Server LocalDB + fixes: sidebar logo and sort link under basePath, "Last update" moves
   forward with new readings, batched recompute-all (6.4 s → 0.4 s), audit RecordId length, import keeps install date,
   files removed with their machine/standard, maintenance order, collation note in admin handoff
