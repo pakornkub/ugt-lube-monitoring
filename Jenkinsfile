@@ -1,0 +1,432 @@
+// ============================================================================
+// Org-standard Jenkins pipeline — 10 stages
+// Checkout → Install → Code Quality (parallel) → Unit Tests → Build
+//   → OWASP Dependency Check → SonarQube Analysis → Quality Gate
+//   → Docker Build → Deploy
+//
+// Placeholders to replace (see SKILL.md replacement table):
+//   ugt-lube-monitoring          kebab-case id (image/container/credential/sonar key)
+//   UGT Reliability Lube Monitoring  human-readable name
+//   /ugt-lube-monitoring        e.g. /my-app        (omit / adapt if no basePath)
+//   /ugt-lube-monitoring-dev         e.g. /my-app-dev
+//   https://CHANGE_ME_APP_HOST/ugt-lube-monitoring          e.g. https://apps.example.com/my-app
+//   https://CHANGE_ME_APP_HOST/ugt-lube-monitoring-dev           e.g. https://apps.example.com/my-app-dev
+//
+// Sections marked [DB] are OPTIONAL — delete them if the project has no
+// database / Prisma migrations.
+// (No Sentry in this project — the [SENTRY] sections were removed.)
+// Sections marked [VOLUME] prepare persistent-data host paths before deploy —
+// delete them if the project has no volumes.
+// ============================================================================
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        // One build per job at a time: a second push queues instead of running `prisma migrate
+        // deploy` + `docker compose up` against the same container while the first still deploys.
+        disableConcurrentBuilds()
+        // No global timeout — OWASP NVD download can take 60-90 min on first run
+        // Per-stage timeouts are set individually below
+        buildDiscarder(logRotator(
+            artifactDaysToKeepStr: '7',
+            numToKeepStr: '10'
+        ))
+    }
+
+    tools {
+        nodejs 'NodeJS-22'   // must match Manage Jenkins → Tools → NodeJS name
+    }
+
+    environment {
+        CI                  = 'true'   // activates JUnit reporter + standalone output
+        SKIP_ENV_VALIDATION = '1'      // bypass @t3-oss/env-nextjs in CI (never in prod container)
+        NEXT_PUBLIC_APP_NAME = 'UGT Reliability Lube Monitoring'
+        // NOTIFY_EMAIL and SMTP_FROM must be set in
+        // Manage Jenkins → System → Global properties → Environment variables
+        // NEXT_PUBLIC_BASE_PATH / NEXT_PUBLIC_APP_URL are resolved per-branch
+        // inside script {} in the Docker Build stage — NOT here (values differ per branch)
+    }
+
+    stages {
+        // ── 0. Checkout ────────────────────────────────────────────────────
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        // ── 1. Install ─────────────────────────────────────────────────────
+        stage('Install') {
+            steps {
+                sh 'npm ci --include=optional'
+                // [DB] Generate Prisma client types — required before tsc/lint/build.
+                // Delete this line if the project has no Prisma.
+                sh 'npx prisma generate'
+            }
+        }
+
+        // ── 2. Code Quality (parallel) ─────────────────────────────────────
+        stage('Code Quality') {
+            parallel {
+                stage('Lint') {
+                    steps { sh 'npm run lint' }
+                }
+                stage('Format Check') {
+                    steps { sh 'npm run format:check' }
+                }
+                stage('TypeScript') {
+                    steps { sh 'npx tsc --noEmit' }
+                }
+            }
+        }
+
+        // ── 3. Unit Tests ──────────────────────────────────────────────────
+        stage('Unit Tests') {
+            steps {
+                sh 'npm run test:coverage'
+            }
+            post {
+                always {
+                    // vitest.config.ts must enable the junit reporter when CI=true:
+                    //   reporters: process.env.CI ? ['verbose', 'junit'] : ['verbose'],
+                    //   outputFile: { junit: 'test-results/junit.xml' },
+                    junit allowEmptyResults: true, testResults: 'test-results/junit.xml'
+                    publishHTML([
+                        allowMissing         : false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll              : true,
+                        reportDir            : 'coverage',
+                        reportFiles          : 'index.html',
+                        reportName           : 'Coverage Report'
+                    ])
+                }
+            }
+        }
+
+        // ── 4. Build ───────────────────────────────────────────────────────
+        stage('Build') {
+            steps {
+                // SKIP_ENV_VALIDATION=1 bypasses env schema validation — no secrets in CI build
+                sh 'npm run build'
+            }
+        }
+
+        // ── 5. OWASP Dependency Check ──────────────────────────────────────
+        stage('OWASP Dependency Check') {
+            options {
+                // NVD has ~20k records; first run or full refresh can take 60-90 min
+                // Subsequent runs use local cache and finish in ~5 min
+                timeout(time: 90, unit: 'MINUTES')
+            }
+            steps {
+                // nvd = Secret Text credential in Jenkins (Manage Jenkins → Credentials)
+                // Without API key: rate-limited to 5 req/30s (very slow); with key: 50 req/30s
+                // --noupdate (below) scans against the LOCAL NVD cache only — requires a
+                // separate periodic `dependency-check --updateonly` job, or remove
+                // --noupdate on the very first run (60-90 min download):
+                // see references/jenkins-one-time-setup.md → NVD data strategy
+                // Write API key to a temp properties file via sh — the SHELL expands
+                // $NVD_API_KEY, NOT Groovy. Never interpolate secrets in Groovy strings.
+                withCredentials([string(credentialsId: 'nvd', variable: 'NVD_API_KEY')]) {
+                    sh 'printf "nvd.api.key=%s\\n" "$NVD_API_KEY" > dc-nvd.properties'
+                    dependencyCheck(
+                        additionalArguments: '''
+                            --scan ./
+                            --format HTML
+                            --format XML
+                            --format JSON
+                            --out ./dc-report
+                            --suppression ./owasp-suppressions.xml
+                            --exclude ".next/**"
+                            --exclude "node_modules/**"
+                            --exclude "coverage/**"
+                            --propertyfile dc-nvd.properties
+                            --noupdate
+                        ''',
+                        odcInstallation: 'Dependency-Check'   // must match Manage Jenkins → Tools name
+                    )
+                }
+            }
+            post {
+                always {
+                    // Remove temp properties file (contains NVD API key) — always runs even on failure
+                    sh 'rm -f dc-nvd.properties'
+                    // dependencyCheckPublisher thresholds are suppression-aware:
+                    // they count ONLY unsuppressed vulnerabilities from <vulnerabilities>,
+                    // ignoring items in <suppressedVulnerabilities>.
+                    // Do NOT use raw grep on the XML — grep also matches suppressed items
+                    // and causes false-positive build failures.
+                    dependencyCheckPublisher(
+                        pattern: 'dc-report/dependency-check-report.xml',
+                        failedTotalCritical: 1,   // FAIL on any CRITICAL
+                        unstableTotalHigh: 1      // UNSTABLE on any HIGH
+                    )
+                    archiveArtifacts artifacts: 'dc-report/dependency-check-report.*', allowEmptyArchive: true
+                }
+            }
+        }
+
+        // ── 6. SonarQube Analysis ──────────────────────────────────────────
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def br        = (env.BRANCH_NAME ?: env.GIT_BRANCH?.tokenize('/')?.last())
+                    def isProd    = (br == 'main')
+                    // Each environment gets its own SonarQube project to keep metrics isolated.
+                    // -D flags override the values in sonar-project.properties at scan time.
+                    def sonarKey  = isProd ? 'ugt-lube-monitoring'          : 'ugt-lube-monitoring-dev'
+                    def sonarName = isProd ? 'UGT Reliability Lube Monitoring'  : 'UGT Reliability Lube Monitoring (Dev)'
+                    // dc-report/ already exists from the OWASP stage above — SonarQube DC
+                    // plugin imports it via sonar.dependencyCheck.jsonReportPath
+                    // withSonarQubeEnv injects SONAR_HOST_URL + SONAR_TOKEN from Jenkins config
+                    withSonarQubeEnv('SonarQube') {
+                        sh "${tool('SonarQube-Scanner')}/bin/sonar-scanner -Dsonar.projectKey=${sonarKey} -Dsonar.projectName='${sonarName}'"
+                    }
+                }
+            }
+        }
+
+        // ── 7. Quality Gate ────────────────────────────────────────────────
+        stage('Quality Gate') {
+            steps {
+                // Waits for SonarQube webhook callback; requires webhook configured
+                // in SonarQube → Administration → Webhooks → http://<jenkins-host>:8080/sonarqube-webhook/
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        // ── 8. Docker Build (main + develop only) ──────────────────────────
+        stage('Docker Build') {
+            when {
+                expression {
+                    def br = (env.BRANCH_NAME ?: env.GIT_BRANCH?.tokenize('/')?.last())
+                    br == 'main' || br == 'develop'
+                }
+            }
+            steps {
+                script {
+                    def br        = (env.BRANCH_NAME ?: env.GIT_BRANCH?.tokenize('/')?.last())
+                    def isProd    = (br == 'main')
+                    // Branch-specific build args — NEXT_PUBLIC_* (any client-side var)
+                    // are baked into the bundle at compile time → MUST be build args,
+                    // never runtime environment
+                    def basePath  = isProd ? '/ugt-lube-monitoring' : '/ugt-lube-monitoring-dev'
+                    def appUrl    = isProd ? 'https://CHANGE_ME_APP_HOST/ugt-lube-monitoring'   : 'https://CHANGE_ME_APP_HOST/ugt-lube-monitoring-dev'
+                    def imageName = isProd ? 'ugt-lube-monitoring'   : 'ugt-lube-monitoring-dev'
+                    def buildNum  = env.BUILD_NUMBER
+                    // deploymentId: build number + commit — BUILD_NUMBER alone restarts at 1 when the
+                    // job is recreated, and an old open tab could then match a new build (references/version-skew.md)
+                    def deployId  = "${buildNum}-${(env.GIT_COMMIT ?: 'nogit').take(8)}"
+                    // Image 1: builder target — keeps node_modules + prisma/migrations
+                    //          for the [DB] migrate step in Deploy.
+                    //          [DB] If no database: this builder image build can be deleted.
+                    // Image 2: runner (production image deployed by docker-compose)
+                    // --network host: npm run build needs internet (e.g. Google Fonts fetch)
+                    // NEXT_DEPLOYMENT_ID = deployId (build number + commit) on BOTH builds (same id in both images) —
+                    //   next.config deploymentId; lets Next.js detect a tab left open across a
+                    //   deploy instead of failing every Server Action (references/version-skew.md)
+                    sh """
+                        docker build \\
+                            --network host \\
+                            --target builder \\
+                            --build-arg NEXT_PUBLIC_BASE_PATH=${basePath} \\
+                            --build-arg NEXT_PUBLIC_APP_URL=${appUrl} \\
+                            --build-arg NEXT_PUBLIC_APP_NAME="${env.NEXT_PUBLIC_APP_NAME}" \\
+                            --build-arg NEXT_DEPLOYMENT_ID=${deployId} \\
+                            -t ${imageName}:${buildNum}-builder \\
+                            .
+                        docker build \\
+                            --network host \\
+                            --build-arg NEXT_PUBLIC_BASE_PATH=${basePath} \\
+                            --build-arg NEXT_PUBLIC_APP_URL=${appUrl} \\
+                            --build-arg NEXT_PUBLIC_APP_NAME="${env.NEXT_PUBLIC_APP_NAME}" \\
+                            --build-arg NEXT_DEPLOYMENT_ID=${deployId} \\
+                            -t ${imageName}:latest \\
+                            -t ${imageName}:${buildNum} \\
+                            .
+                    """
+                }
+            }
+        }
+
+        // ── 9. Deploy (main + develop only) ────────────────────────────────
+        stage('Deploy') {
+            when {
+                expression {
+                    def br = (env.BRANCH_NAME ?: env.GIT_BRANCH?.tokenize('/')?.last())
+                    br == 'main' || br == 'develop'
+                }
+            }
+            steps {
+                script {
+                    def br            = (env.BRANCH_NAME ?: env.GIT_BRANCH?.tokenize('/')?.last())
+                    def isProd        = (br == 'main')
+                    // Branch-specific deployment targets
+                    def envCredId     = isProd ? 'env-ugt-lube-monitoring'  : 'env-ugt-lube-monitoring-dev'
+                    def imageName     = isProd ? 'ugt-lube-monitoring'      : 'ugt-lube-monitoring-dev'
+                    def composeFile   = isProd ? 'docker-compose.yml'    : 'docker-compose.dev.yml'
+                    def containerName = isProd ? 'ugt-lube-monitoring'      : 'ugt-lube-monitoring-dev'
+                    def buildNum      = env.BUILD_NUMBER
+                    def migImage      = "${imageName}:${buildNum}-builder"
+
+                    // envCredId = Secret File credential (the environment's .env file)
+                    withCredentials([file(credentialsId: envCredId, variable: 'ENV_FILE')]) {
+                        sh 'cp $ENV_FILE .env'
+
+                        // [DB] Apply pending migrations using the builder image
+                        //      (has node_modules + prisma/migrations).
+                        //      Extract DATABASE_URL directly — tr -d '"\r' strips
+                        //      surrounding quotes AND Windows CRLF that docker
+                        //      --env-file does not remove.
+                        //      Delete this sh block if the project has no database.
+                        //      set +x + `-e DATABASE_URL` (name only, value from the
+                        //      exported env): Jenkins runs sh with -x, so the trace
+                        //      would print the full connection string — password
+                        //      included. withCredentials masks the credential's
+                        //      file path, never the secrets inside the file.
+                        sh """
+                          set +x
+                          export DATABASE_URL="\$(grep "^DATABASE_URL=" .env | cut -d= -f2- | tr -d '"\r')"
+                          docker run --rm \\
+                            -e DATABASE_URL \\
+                            -e SKIP_ENV_VALIDATION=1 \\
+                            --entrypoint npx \\
+                            ${migImage} \\
+                            prisma migrate deploy
+                        """
+
+                        // [VOLUME] เตรียม path ข้อมูลถาวรครั้งแรก (idempotent) — chown ผ่าน container
+                        // เพราะ jenkins ไม่ใช่ root แต่อยู่ใน docker group; admin เตรียม /home/docker02/appdata แล้ว
+                        //
+                        // สำคัญ: เช็ค **ทีละ subdir ที่ compose bind จริง** ไม่ใช่เช็คที่ระดับโปรเจค —
+                        // guard แบบเดิม (`if [ ! -d <project> ]`) กลายเป็น no-op ถาวรทันทีที่ deploy
+                        // แรกสร้างโฟลเดอร์โปรเจคขึ้นมา แล้ว volume ที่เพิ่มทีหลังจะไม่มีวันถูกสร้าง:
+                        // dockerd สร้างให้เองเป็น root:root ตอน `up -d` แล้ว user `nextjs` ในคอนเทนเนอร์
+                        // เขียนไม่ได้ (PermissionError) ทั้งที่ container ขึ้น healthy ปกติ
+                        // → volume ของโปรเจคนี้: storage (ไฟล์แนบ — ugt-nextjs-upload-setup)
+                        // ไม่มี volume → ลบบล็อกนี้ทั้งหมด (เหมือน [DB] / [SENTRY])
+                        sh """
+                          APP_UID=\$(docker run --rm ${imageName}:${buildNum} id -u)
+                          # Runs INSIDE a throwaway container on the Docker host (same path mounted) —
+                          # never on the Jenkins agent's own disk, so it is right even when Jenkins is
+                          # another machine that only mounts the docker socket.
+                          docker run --rm -e APP_UID="\$APP_UID" -v /home/docker02/appdata:/home/docker02/appdata alpine sh -c '
+                            for p in /home/docker02/appdata/${containerName}/storage; do
+                              if [ ! -d "\$p" ]; then mkdir -p "\$p" && chown -R "\$APP_UID" "\$p"; fi
+                            done'
+                        """
+
+                        // --no-build: reuse the image from Docker Build stage.
+                        // Without it, compose rebuilds WITHOUT the NEXT_PUBLIC_* build
+                        // args → broken bundle.
+                        // `docker compose` (v2, no hyphen) — org default. The standalone
+                        // `docker-compose` (v1) has been EOL since mid-2023 and ships with
+                        // no current Docker Engine; a host that still only has v1 needs
+                        // this one line changed back (`docker-compose -f ...`).
+                        sh "docker compose -f ${composeFile} up -d --no-build"
+
+                        // Wait until container is healthy (max 4 minutes = 24 × 10s).
+                        // Poll docker inspect health status — not wget — so the result
+                        // matches the container's own HEALTHCHECK.
+                        sh """
+                          echo "Waiting for container to become healthy..."
+                          for i in \$(seq 1 24); do
+                            STATUS=\$(docker inspect --format='{{.State.Health.Status}}' ${containerName} 2>/dev/null || echo "not-found")
+                            echo "Attempt \$i/24 — health status: \$STATUS"
+                            if [ "\$STATUS" = "healthy" ]; then
+                              echo "Container is healthy!"
+                              exit 0
+                            elif [ "\$STATUS" = "unhealthy" ]; then
+                              echo "Container is unhealthy!"
+                              exit 1
+                            fi
+                            sleep 10
+                          done
+                          echo "Container did not become healthy within 4 minutes (last status: \$STATUS)"
+                          exit 1
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Notifications & Cleanup ────────────────────────────────────────────
+    // NOTIFY_EMAIL + SMTP_FROM come from Jenkins Global env vars — never hardcode.
+    post {
+        success {
+            emailext(
+                subject: "[Jenkins] SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: """
+                    <h2>Pipeline Success Notification</h2>
+                    <p><strong>Pipeline:</strong> ${env.JOB_NAME}</p>
+                    <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                    <p><strong>Status:</strong> <span style="color:green;">SUCCESS</span></p>
+                    <p><strong>Branch:</strong> ${env.BRANCH_NAME ?: env.GIT_BRANCH}</p>
+                    <p><strong>Details:</strong> All stages passed. Docker image deployed.</p>
+                    <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                """,
+                to: "${NOTIFY_EMAIL}",
+                from: "Jenkins CI <${env.SMTP_FROM}>",
+                mimeType: 'text/html'
+            )
+        }
+        unstable {
+            emailext(
+                subject: "[Jenkins] UNSTABLE: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: """
+                    <h2>Pipeline Unstable Notification</h2>
+                    <p><strong>Pipeline:</strong> ${env.JOB_NAME}</p>
+                    <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                    <p><strong>Status:</strong> <span style="color:orange;">UNSTABLE</span></p>
+                    <p><strong>Branch:</strong> ${env.BRANCH_NAME ?: env.GIT_BRANCH}</p>
+                    <p><strong>Details:</strong> Pipeline completed with warnings (e.g. HIGH severity vulnerabilities found). Review dc-report.</p>
+                    <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                """,
+                to: "${NOTIFY_EMAIL}",
+                from: "Jenkins CI <${env.SMTP_FROM}>",
+                mimeType: 'text/html'
+            )
+        }
+        failure {
+            emailext(
+                subject: "[Jenkins] FAILURE: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: """
+                    <h2>Pipeline Failure Notification</h2>
+                    <p><strong>Pipeline:</strong> ${env.JOB_NAME}</p>
+                    <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                    <p><strong>Status:</strong> <span style="color:red;">FAILURE</span></p>
+                    <p><strong>Branch:</strong> ${env.BRANCH_NAME ?: env.GIT_BRANCH}</p>
+                    <p><strong>Details:</strong> Check the console output for errors.</p>
+                    <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                """,
+                to: "${NOTIFY_EMAIL}",
+                from: "Jenkins CI <${env.SMTP_FROM}>",
+                mimeType: 'text/html'
+            )
+        }
+        aborted {
+            emailext(
+                subject: "[Jenkins] ABORTED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: """
+                    <h2>Pipeline Aborted Notification</h2>
+                    <p><strong>Pipeline:</strong> ${env.JOB_NAME}</p>
+                    <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                    <p><strong>Status:</strong> <span style="color:orange;">ABORTED</span></p>
+                    <p><strong>Branch:</strong> ${env.BRANCH_NAME ?: env.GIT_BRANCH}</p>
+                    <p><strong>Reason:</strong> Aborted due to SonarQube Quality Gate failure, CRITICAL/HIGH vulnerability, or timeout.</p>
+                    <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                """,
+                to: "${NOTIFY_EMAIL}",
+                from: "Jenkins CI <${env.SMTP_FROM}>",
+                mimeType: 'text/html'
+            )
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

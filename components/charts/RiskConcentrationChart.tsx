@@ -1,13 +1,19 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import { Bar } from "react-chartjs-2";
-import type { Chart, ChartOptions } from "chart.js";
-import { barEntrance, ensureChartRegistered, stackedBarLook, tokenColor, tooltipLook } from "@/lib/chart";
-import { useIsDarkMode } from "@/lib/useIsDarkMode";
-import type { TypeAgg } from "@/lib/queries/assets";
-import { ProblemsToggle, StatusLegend } from "./ProblemsToggle";
-import { problemRows } from "./problem-rows";
+import { useMemo, useState } from 'react';
+import { Bar } from 'react-chartjs-2';
+import type { Chart, ChartOptions } from 'chart.js';
+import {
+  barEntrance,
+  ensureChartRegistered,
+  stackedBarLook,
+  tokenColor,
+  tooltipLook,
+} from '@/lib/chart';
+import { useIsDarkMode } from '@/lib/useIsDarkMode';
+import type { TypeAgg } from '@/lib/queries/assets';
+import { ProblemsToggle, StatusLegend } from './ProblemsToggle';
+import { problemRows } from './problem-rows';
 
 ensureChartRegistered();
 
@@ -17,21 +23,20 @@ const TOP_N = 10;
 const ROW_H = 28; // px per bar row (fits the 14px labels)
 const CHART_PAD = 16; // extra px for axes
 
-
 // Draws the fleet total at the right end of each stacked bar so counts stay
 // readable without hovering — important when many types are shown.
 const barTotalsPlugin = {
-  id: "barTotals",
-  afterDatasetsDraw(chart: Chart<"bar">) {
+  id: 'barTotals',
+  afterDatasetsDraw(chart: Chart<'bar'>) {
     const { ctx } = chart;
     const ds = chart.data.datasets as { data: number[] }[];
     if (!ds.length) return;
     const meta0 = chart.getDatasetMeta(0);
     ctx.save();
     // Plugin runs outside React, so read the theme straight off the DOM.
-    ctx.fillStyle = tokenColor("t2");
-    ctx.font = "700 14px ui-sans-serif, system-ui";
-    ctx.textBaseline = "middle";
+    ctx.fillStyle = tokenColor('t2');
+    ctx.font = '700 14px ui-sans-serif, system-ui';
+    ctx.textBaseline = 'middle';
     for (let i = 0; i < meta0.data.length; i++) {
       const total = ds.reduce((sum, d) => sum + (d.data[i] ?? 0), 0);
       const y = meta0.data[i]?.y;
@@ -46,9 +51,9 @@ const barTotalsPlugin = {
 export function RiskConcentrationChart({ data }: { data: TypeAgg[] }) {
   const dark = useIsDarkMode();
   void dark; // re-render on theme change so tokenColor() reads the new palette
-  const tick = tokenColor("t2");
-  const tickMuted = tokenColor("t2");
-  const grid = tokenColor("border", 0.35);
+  const tick = tokenColor('t2');
+  const tickMuted = tokenColor('t2');
+  const grid = tokenColor('border', 0.35);
   const look = stackedBarLook(true);
   const [showAll, setShowAll] = useState(false);
   const [problemsOnly, setProblemsOnly] = useState(true);
@@ -57,7 +62,7 @@ export function RiskConcentrationChart({ data }: { data: TypeAgg[] }) {
   // Whole fleet: ordered by fleet size (most -> least machines).
   const sorted: TypeAgg[] = useMemo(
     () => (problemsOnly ? problemRows(data) : [...data].sort((a, b) => b.total - a.total)),
-    [data, problemsOnly],
+    [data, problemsOnly]
   );
   const expandable = sorted.length > TOP_N;
 
@@ -72,14 +77,14 @@ export function RiskConcentrationChart({ data }: { data: TypeAgg[] }) {
         critical: acc.critical + d.critical,
         total: acc.total + d.total,
       }),
-      { healthy: 0, warning: 0, critical: 0, total: 0 },
+      { healthy: 0, warning: 0, critical: 0, total: 0 }
     );
     return [
       ...top,
       {
         type: `อื่นๆ (${rest.length} ประเภท)`,
-        abbr: "",
-        color: "#94a3b8",
+        abbr: '',
+        color: '#94a3b8',
         ...agg,
       },
     ];
@@ -93,35 +98,35 @@ export function RiskConcentrationChart({ data }: { data: TypeAgg[] }) {
     labels,
     datasets: [
       {
-        label: "วิกฤต",
+        label: 'วิกฤต',
         data: rows.map((d) => d.critical),
-        backgroundColor: tokenColor("red", 0.8),
-        hoverBackgroundColor: tokenColor("red"),
-        stack: "s",
+        backgroundColor: tokenColor('red', 0.8),
+        hoverBackgroundColor: tokenColor('red'),
+        stack: 's',
         ...look,
       },
       {
-        label: "เฝ้าระวัง",
+        label: 'เฝ้าระวัง',
         data: rows.map((d) => d.warning),
-        backgroundColor: tokenColor("yellow", 0.75),
-        hoverBackgroundColor: tokenColor("yellow"),
-        stack: "s",
+        backgroundColor: tokenColor('yellow', 0.75),
+        hoverBackgroundColor: tokenColor('yellow'),
+        stack: 's',
         ...look,
       },
       {
-        label: "ปกติ",
+        label: 'ปกติ',
         // problems-only: the healthy machines would dwarf the few that need attention
         data: rows.map((d) => (problemsOnly ? 0 : d.healthy)),
-        backgroundColor: tokenColor("green", 0.55),
-        hoverBackgroundColor: tokenColor("green", 0.8),
-        stack: "s",
+        backgroundColor: tokenColor('green', 0.55),
+        hoverBackgroundColor: tokenColor('green', 0.8),
+        stack: 's',
         ...look,
       },
     ],
   };
 
-  const options: ChartOptions<"bar"> = {
-    indexAxis: "y",
+  const options: ChartOptions<'bar'> = {
+    indexAxis: 'y',
     responsive: true,
     maintainAspectRatio: false,
     animation: barEntrance(),
@@ -137,7 +142,7 @@ export function RiskConcentrationChart({ data }: { data: TypeAgg[] }) {
           },
           footer(items) {
             const idx = items[0]?.dataIndex ?? -1;
-            if (idx < 0) return "";
+            if (idx < 0) return '';
             return `ทั้งหมด ${ds0[idx].total} เครื่อง`;
           },
         },
@@ -167,7 +172,6 @@ export function RiskConcentrationChart({ data }: { data: TypeAgg[] }) {
     },
   };
 
-
   const chartHeight = rows.length * ROW_H + CHART_PAD;
   const scrollable = showAll && expandable;
 
@@ -191,11 +195,13 @@ export function RiskConcentrationChart({ data }: { data: TypeAgg[] }) {
             {showAll ? `ย่อเหลือ Top ${TOP_N}` : `แสดงทั้งหมด (${sorted.length} ประเภท)`}
           </button>
         )}
-        <span className="text-[13px] text-t3">{problemsOnly ? "เรียงตามจำนวนเครื่องที่มีปัญหา" : "เรียงตามจำนวนเครื่องจักร"}</span>
+        <span className="text-[13px] text-t3">
+          {problemsOnly ? 'เรียงตามจำนวนเครื่องที่มีปัญหา' : 'เรียงตามจำนวนเครื่องจักร'}
+        </span>
       </div>
       {data.length === 0 || sorted.length === 0 ? (
         <div className="flex h-[230px] items-center justify-center text-[14px] text-t3">
-          {data.length === 0 ? "ไม่มีข้อมูลในขอบเขตที่เลือก" : "ทุกประเภทอยู่ในเกณฑ์ปกติ"}
+          {data.length === 0 ? 'ไม่มีข้อมูลในขอบเขตที่เลือก' : 'ทุกประเภทอยู่ในเกณฑ์ปกติ'}
         </div>
       ) : scrollable ? (
         <div className="mt-1 max-h-[340px] overflow-y-auto pr-1">{chart}</div>

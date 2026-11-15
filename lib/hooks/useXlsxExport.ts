@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useToast } from "@/components/ui/Toast";
+import { useState } from 'react';
+import { useToast } from '@/components/ui/Toast';
 
 // Shared "fetch rows → download as .xlsx" handler — the busy-state/try/toast
 // wiring around lib/export-xlsx.ts's downloadXlsx was copy-pasted near-verbatim
@@ -15,7 +15,7 @@ export function useXlsxExport<T>(
     sheet: string;
     headers: string[];
     mapRow: (row: T) => (string | number | null | undefined)[];
-  },
+  }
 ) {
   const toast = useToast();
   const [exporting, setExporting] = useState(false);
@@ -26,16 +26,16 @@ export function useXlsxExport<T>(
       const rows = await fetchRows();
       // Dynamically imported (not a top-level import) so the xlsx library
       // stays out of the initial bundle for pages that may never export.
-      const { downloadXlsx } = await import("@/lib/export-xlsx");
+      const { downloadXlsx } = await import('@/lib/export-xlsx');
       downloadXlsx(
         `${opts.filenamePrefix}-${new Date().toISOString().slice(0, 10)}.xlsx`,
         opts.sheet,
         opts.headers,
-        rows.map(opts.mapRow),
+        rows.map(opts.mapRow)
       );
-      toast(`ส่งออก ${rows.length} รายการสำเร็จ`, "success");
+      toast(`ส่งออก ${rows.length} รายการสำเร็จ`, 'success');
     } catch {
-      toast("ส่งออกไม่สำเร็จ", "error");
+      toast('ส่งออกไม่สำเร็จ', 'error');
     } finally {
       setExporting(false);
     }

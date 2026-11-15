@@ -1,56 +1,84 @@
-import { z } from "zod";
+// lib/env.ts — type-safe env validation via @t3-oss/env-nextjs + zod.
+// App code MUST import env from here — never read process.env directly.
+import { createEnv } from '@t3-oss/env-nextjs';
+import { z } from 'zod';
 
-// Environment flags. Demo Mode lets the app run a local preview without a live
-// Supabase project. It is strictly opt-in via DEMO_MODE and auto-disables the
-// moment real Supabase values are present.
-export function isSupabaseConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  );
-}
+export const env = createEnv({
+  server: {
+    // ── 1. App + runtime
+    APP_PORT: z.string().optional(),
+    // Host cron → /api/cron/<job> sends it as a Bearer token.
+    CRON_SECRET: z.string().optional(),
 
-export function isDemoMode(): boolean {
-  if (process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1") {
-    return true;
-  }
-  // Safety: if DEMO_MODE is explicitly off but Supabase isn't configured, still
-  // run demo so `npm run dev` never hard-crashes on a fresh clone. Disable by
-  // providing real Supabase env OR setting DEMO_MODE=false.
-  if (process.env.DEMO_MODE !== "false" && !isSupabaseConfigured()) {
-    return true;
-  }
-  return false;
-}
+    // ── 2. Database
+    DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
-// Local Store: Demo Mode that really saves Data Entry readings + lab files to disk
-// (lib/local-store.ts) as a bridge until Supabase / a company DB server is set up.
-// Opt-in with LOCAL_STORE=true. Never on Vercel — its filesystem is read-only and
-// wiped between requests, so "saved" data would silently vanish.
-export function isLocalStore(): boolean {
-  if (!isDemoMode()) return false;
-  if (process.env.VERCEL) return false;
-  return process.env.LOCAL_STORE === "true" || process.env.LOCAL_STORE === "1";
-}
+    // ── 3. Auth
+    BETTER_AUTH_SECRET: z.string().min(32),
+    BETTER_AUTH_URL: z.url(),
+    BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
+    ORG_EMAIL_DOMAINS: z.string().optional(),
+    KEYCLOAK_ISSUER: z.url(),
+    KEYCLOAK_CLIENT_ID: z.string().min(1),
+    KEYCLOAK_CLIENT_SECRET: z.string().min(1),
 
-// Any of these vars that ARE present must be well-formed — catches a
-// truncated/typo'd key at boot instead of a confusing failure deep inside a
-// Supabase call later. Presence itself stays optional (Demo Mode has none).
-const EnvShape = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional().or(z.literal("")),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20).optional().or(z.literal("")),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional().or(z.literal("")),
+    // ── 4. Mail
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.string().default('25'),
+    SMTP_SECURE: z.enum(['true', 'false']).default('false'),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_FROM: z.string().optional(),
+
+    // ── 5. Upload
+    STORAGE_ROOT: z.string().default('./storage'),
+    UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(26_214_400),
+
+    // ── 6. Project-specific — AI diagnosis (server-only key; rule-based fallback without it)
+    AI_PROVIDER: z.string().optional(),
+    AI_API_KEY: z.string().optional(),
+    AI_MODEL: z.string().optional(),
+    AI_BASE_URL: z.string().optional(),
+
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  },
+
+  client: {
+    NEXT_PUBLIC_BASE_PATH: z.string().default(''),
+    NEXT_PUBLIC_APP_NAME: z.string().optional(),
+    NEXT_PUBLIC_APP_URL: z.string().optional(),
+  },
+
+  runtimeEnv: {
+    APP_PORT: process.env.APP_PORT,
+    CRON_SECRET: process.env.CRON_SECRET,
+    DATABASE_URL: process.env.DATABASE_URL,
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    BETTER_AUTH_TRUSTED_ORIGINS: process.env.BETTER_AUTH_TRUSTED_ORIGINS,
+    ORG_EMAIL_DOMAINS: process.env.ORG_EMAIL_DOMAINS,
+    KEYCLOAK_ISSUER: process.env.KEYCLOAK_ISSUER,
+    KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID,
+    KEYCLOAK_CLIENT_SECRET: process.env.KEYCLOAK_CLIENT_SECRET,
+    SMTP_HOST: process.env.SMTP_HOST,
+    SMTP_PORT: process.env.SMTP_PORT,
+    SMTP_SECURE: process.env.SMTP_SECURE,
+    SMTP_USER: process.env.SMTP_USER,
+    SMTP_PASS: process.env.SMTP_PASS,
+    SMTP_FROM: process.env.SMTP_FROM,
+    STORAGE_ROOT: process.env.STORAGE_ROOT,
+    UPLOAD_MAX_BYTES: process.env.UPLOAD_MAX_BYTES,
+    AI_PROVIDER: process.env.AI_PROVIDER,
+    AI_API_KEY: process.env.AI_API_KEY,
+    AI_MODEL: process.env.AI_MODEL,
+    AI_BASE_URL: process.env.AI_BASE_URL,
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_BASE_PATH: process.env.NEXT_PUBLIC_BASE_PATH,
+    NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  },
+
+  // CI / `next build` without secrets: SKIP_ENV_VALIDATION=1
+  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  emptyStringAsUndefined: true,
 });
-
-// Called once from instrumentation.ts on server boot.
-export function validateEnv(): void {
-  const result = EnvShape.safeParse({
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  });
-  if (!result.success) {
-    const issues = result.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
-    console.error(`[env] Invalid environment variable(s) at startup:\n${issues}`);
-  }
-}

@@ -1,6 +1,6 @@
 // Domain types mirroring supabase/0001_schema.sql.
 // NOTE: Health/Status are DERIVED server-side (compute_health) and cached on `assets`.
-export type AssetStatus = "Healthy" | "Warning" | "Critical";
+export type AssetStatus = 'Healthy' | 'Warning' | 'Critical';
 // Roles are DYNAMIC (supabase/0023_dynamic_rbac.sql's `roles` table) — an admin
 // can create new roles through the app, so this can no longer be a fixed
 // literal union. What a role can actually DO is resolved via has_permission(),
@@ -10,6 +10,7 @@ export type UserRole = string;
 export interface Profile {
   id: string;
   full_name: string | null;
+  email?: string;
   /** The role the app renders as — the previewed one while an admin uses "view as". */
   role: UserRole;
   /** Set while previewing: the user's own role (Demo Mode's user is always admin). */
@@ -94,7 +95,7 @@ export interface VibReading {
 
 export interface AlarmParam {
   id: string;
-  category: "oil" | "vib";
+  category: 'oil' | 'vib';
   key: string;
   name: string;
   unit: string | null;
@@ -117,7 +118,7 @@ export interface ScoreConfig {
 export interface AssetAlarmOverride {
   id: string;
   asset_id: string;
-  category: "oil" | "vib";
+  category: 'oil' | 'vib';
   key: string;
   warn_limit: number | null;
   crit_limit: number | null;
@@ -137,7 +138,7 @@ export interface AssetScoreOverride {
 export interface MaintenanceRecord {
   id: string;
   asset_id: string;
-  type: "pm" | "cm";
+  type: 'pm' | 'cm';
   work_date: string | null;
   wo_no: string | null;
   description: string | null;
@@ -146,12 +147,7 @@ export interface MaintenanceRecord {
   technician: string | null;
 }
 
-export type StandardCategory =
-  | "TRIBOLOGY"
-  | "VIBRATION"
-  | "RELIABILITY"
-  | "ASSET"
-  | "CUSTOM";
+export type StandardCategory = 'TRIBOLOGY' | 'VIBRATION' | 'RELIABILITY' | 'ASSET' | 'CUSTOM';
 
 export interface Standard {
   id: string;
@@ -176,7 +172,7 @@ export interface ReadingAttachment {
   id: string;
   asset_id: string;
   period: string | null;
-  kind: "oil" | "vib" | null;
+  kind: 'oil' | 'vib' | null;
   file_name: string;
   storage_path: string;
   mime_type: string | null;
@@ -193,4 +189,3 @@ export interface StandardAttachment {
   size_bytes: number | null;
   created_at: string;
 }
-

@@ -1,13 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/env";
-import {
-  getDemoAlarmParams,
-  getDemoAssetAlarmOverrides,
-  getDemoAssetScoreOverride,
-  getDemoScoreConfig,
-} from "@/lib/demo-data";
-import type { AlarmParam, AssetAlarmOverride, AssetScoreOverride, ScoreConfig } from "@/lib/types";
+import { prisma } from '@/lib/prisma';
+import { siteWhere } from '@/lib/queries/permissions';
+import type { AlarmParam, AssetAlarmOverride, AssetScoreOverride, ScoreConfig } from '@/lib/types';
 
 export interface AlarmConfig {
   params: AlarmParam[];
@@ -18,84 +11,88 @@ export interface AssetAlarmConfig extends AlarmConfig {
   hasOverride: boolean;
 }
 
-// `supabase` (here and below): the cron's service-role client; omitted = the user's session.
-export async function getAlarmConfig(supabase?: SupabaseClient): Promise<AlarmConfig> {
-  if (isDemoMode()) {
-    return { params: getDemoAlarmParams(), scoreConfig: getDemoScoreConfig() };
-  }
-  supabase ??= createClient();
-  const [paramsRes, cfgRes] = await Promise.all([
-    supabase
-      .from("alarm_params")
-      .select("id,category,key,name,unit,description,warn_limit,crit_limit,warn_penalty,crit_penalty")
-      .order("category")
-      .order("key"),
-    supabase.from("score_config").select("oil_weight,vib_weight,warn_penalty,crit_penalty").eq("id", 1).maybeSingle(),
+const DEFAULT_SCORE: ScoreConfig = {
+  oil_weight: 100,
+  vib_weight: 0,
+  warn_penalty: 15,
+  crit_penalty: 30,
+};
+const CHUNK = 1000; // SQL Server: 2100 parameters per statement
+
+export async function getAlarmConfig(): Promise<AlarmConfig> {
+  const [params, cfg] = await Promise.all([
+    prisma.alarmParam.findMany({
+      select: {
+        id: true,
+        category: true,
+        key: true,
+        name: true,
+        unit: true,
+        description: true,
+        warn_limit: true,
+        crit_limit: true,
+        warn_penalty: true,
+        crit_penalty: true,
+      },
+      orderBy: [{ category: 'asc' }, { key: 'asc' }],
+    }),
+    prisma.scoreConfig.findUnique({
+      where: { id: 1 },
+      select: { oil_weight: true, vib_weight: true, warn_penalty: true, crit_penalty: true },
+    }),
   ]);
-  if (paramsRes.error) throw new Error(paramsRes.error.message);
   return {
-    params: (paramsRes.data ?? []) as AlarmParam[],
-    scoreConfig: (cfgRes.data as ScoreConfig) ?? {
-      oil_weight: 100,
-      vib_weight: 0,
-      warn_penalty: 15,
-      crit_penalty: 30,
-    },
+    params: params.map((p) => ({ ...p, category: p.category as AlarmParam['category'] })),
+    scoreConfig: cfg ?? DEFAULT_SCORE,
   };
 }
 
-async function getAssetAlarmOverrides(assetId: string, supabase?: SupabaseClient): Promise<AssetAlarmOverride[]> {
-  if (isDemoMode()) return getDemoAssetAlarmOverrides(assetId);
-  supabase ??= createClient();
-  const { data } = await supabase.from("asset_alarm_overrides").select("*").eq("asset_id", assetId);
-  return (data ?? []) as AssetAlarmOverride[];
-}
-
-async function getAssetScoreOverride(assetId: string, supabase?: SupabaseClient): Promise<AssetScoreOverride | null> {
-  if (isDemoMode()) return getDemoAssetScoreOverride(assetId);
-  supabase ??= createClient();
-  const { data } = await supabase.from("asset_score_overrides").select("*").eq("asset_id", assetId).maybeSingle();
-  return (data as AssetScoreOverride) ?? null;
+// `unscoped`: the cron's digest (no user session); otherwise overrides follow the user's plant scope.
+async function overrideWhere(assetIds: string[], unscoped: boolean) {
+  return { asset_id: { in: assetIds }, ...(unscoped ? {} : { asset: await siteWhere() }) };
 }
 
 /** Effective (merged) alarm config for one asset — global config with any
  * asset-level overrides applied on top, param-by-param / field-by-field. */
 // `base`: the global config, when the caller already loaded it for many assets.
-export async function getAssetAlarmConfig(assetId: string, base?: AlarmConfig, supabase?: SupabaseClient): Promise<AssetAlarmConfig> {
-  const [cfg, paramOverrides, scoreOverride] = await Promise.all([
-    base ?? getAlarmConfig(supabase),
-    getAssetAlarmOverrides(assetId, supabase),
-    getAssetScoreOverride(assetId, supabase),
-  ]);
-  return mergeAssetConfig(cfg, paramOverrides, scoreOverride);
+export async function getAssetAlarmConfig(
+  assetId: string,
+  base?: AlarmConfig,
+  unscoped = false
+): Promise<AssetAlarmConfig> {
+  const cfg = base ?? (await getAlarmConfig());
+  return (await getAssetAlarmConfigs([assetId], cfg, unscoped)).get(assetId)!;
 }
 
-/** getAssetAlarmConfig for many assets: two queries for all of them, not two per asset. */
-export async function getAssetAlarmConfigs(assetIds: string[], base: AlarmConfig, supabase?: SupabaseClient): Promise<Map<string, AssetAlarmConfig>> {
+/** getAssetAlarmConfig for many assets: two queries per chunk, not two per asset. */
+export async function getAssetAlarmConfigs(
+  assetIds: string[],
+  base: AlarmConfig,
+  unscoped = false
+): Promise<Map<string, AssetAlarmConfig>> {
   const out = new Map<string, AssetAlarmConfig>();
-  if (isDemoMode()) {
-    for (const id of assetIds) out.set(id, mergeAssetConfig(base, getDemoAssetAlarmOverrides(id), getDemoAssetScoreOverride(id)));
-    return out;
-  }
-  if (!assetIds.length) return out;
-  supabase ??= createClient();
-  const db = supabase;
   const params: AssetAlarmOverride[] = [];
   const scores: AssetScoreOverride[] = [];
-  // 100 ids per request keeps the URL short when hundreds of machines are asked for
-  for (let i = 0; i < assetIds.length; i += 100) {
-    const ids = assetIds.slice(i, i + 100);
-    const [pRes, sRes] = await Promise.all([
-      db.from("asset_alarm_overrides").select("*").in("asset_id", ids),
-      db.from("asset_score_overrides").select("*").in("asset_id", ids),
+  for (let i = 0; i < assetIds.length; i += CHUNK) {
+    const where = await overrideWhere(assetIds.slice(i, i + CHUNK), unscoped);
+    const [p, s] = await Promise.all([
+      prisma.assetAlarmOverride.findMany({ where }),
+      prisma.assetScoreOverride.findMany({ where }),
     ]);
-    if (pRes.error) throw new Error(pRes.error.message);
-    if (sRes.error) throw new Error(sRes.error.message);
-    params.push(...((pRes.data ?? []) as AssetAlarmOverride[]));
-    scores.push(...((sRes.data ?? []) as AssetScoreOverride[]));
+    params.push(
+      ...p.map((o) => ({ ...o, category: o.category as AssetAlarmOverride['category'] }))
+    );
+    scores.push(...s);
   }
   for (const id of assetIds) {
-    out.set(id, mergeAssetConfig(base, params.filter((o) => o.asset_id === id), scores.find((o) => o.asset_id === id) ?? null));
+    out.set(
+      id,
+      mergeAssetConfig(
+        base,
+        params.filter((o) => o.asset_id === id),
+        scores.find((o) => o.asset_id === id) ?? null
+      )
+    );
   }
   return out;
 }
@@ -103,7 +100,7 @@ export async function getAssetAlarmConfigs(assetIds: string[], base: AlarmConfig
 function mergeAssetConfig(
   { params, scoreConfig }: AlarmConfig,
   paramOverrides: AssetAlarmOverride[],
-  scoreOverride: AssetScoreOverride | null,
+  scoreOverride: AssetScoreOverride | null
 ): AssetAlarmConfig {
   const mergedParams = params.map((p) => {
     const ov = paramOverrides.find((o) => o.category === p.category && o.key === p.key);

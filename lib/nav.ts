@@ -2,6 +2,7 @@ import {
   BookOpen,
   Cog,
   FileChartColumn,
+  FileText,
   FlaskConical,
   Gauge,
   History,
@@ -10,7 +11,7 @@ import {
   ShieldCheck,
   Users,
   type LucideIcon,
-} from "lucide-react";
+} from 'lucide-react';
 
 export interface NavItem {
   icon: LucideIcon;
@@ -40,35 +41,106 @@ export interface NavSection {
 
 export const NAV_SECTIONS: NavSection[] = [
   {
-    id: "main",
-    title: "เมนูหลัก (Main modules)",
+    id: 'main',
+    title: 'เมนูหลัก (Main modules)',
     items: [
-      { icon: Gauge, label: "ภาพรวมความเสี่ยง", sub: "Dashboard", href: "/dashboard", enabled: true },
-      { icon: Cog, label: "ฐานข้อมูลเครื่องจักร", sub: "Asset database", href: "/assets", enabled: true, perm: "assets:read" },
-      { icon: FlaskConical, label: "ป้อนข้อมูล", sub: "Data input", href: "/data-entry", enabled: true, perm: "dataentry:read" },
-      { icon: BookOpen, label: "คลังมาตรฐาน", sub: "Standards", href: "/standards", enabled: true, perm: "standards:read" },
-      { icon: SlidersHorizontal, label: "ตั้งค่าแจ้งเตือน", sub: "Alarm config", href: "/config/alarms", enabled: true, perm: "alarms:read" },
-      { icon: FileChartColumn, label: "รายงานผู้บริหาร", sub: "Reports", href: "/reports", enabled: true, perm: "reports:view" },
+      { icon: Gauge, label: 'ภาพรวมความเสี่ยง', sub: 'Dashboard', href: '/dashboard', enabled: true },
+      {
+        icon: Cog,
+        label: 'ฐานข้อมูลเครื่องจักร',
+        sub: 'Asset database',
+        href: '/assets',
+        enabled: true,
+        perm: 'assets:read',
+      },
+      {
+        icon: FlaskConical,
+        label: 'ป้อนข้อมูล',
+        sub: 'Data input',
+        href: '/data-entry',
+        enabled: true,
+        perm: 'dataentry:read',
+      },
+      {
+        icon: BookOpen,
+        label: 'คลังมาตรฐาน',
+        sub: 'Standards',
+        href: '/standards',
+        enabled: true,
+        perm: 'standards:read',
+      },
+      {
+        icon: SlidersHorizontal,
+        label: 'ตั้งค่าแจ้งเตือน',
+        sub: 'Alarm config',
+        href: '/config/alarms',
+        enabled: true,
+        perm: 'alarms:read',
+      },
+      {
+        icon: FileChartColumn,
+        label: 'รายงานผู้บริหาร',
+        sub: 'Reports',
+        href: '/reports',
+        enabled: true,
+        perm: 'reports:view',
+      },
     ],
   },
   {
-    id: "admin",
-    title: "ผู้ดูแลระบบ (Admin)",
+    id: 'admin',
+    title: 'ผู้ดูแลระบบ (Admin)',
     icon: ShieldCheck,
     pinBottom: true,
     collapsible: true,
     defaultCollapsed: true,
     items: [
-      { icon: Users, label: "จัดการผู้ใช้", sub: "Users", href: "/admin/users", enabled: true, perm: "users:manage" },
-      { icon: ShieldCheck, label: "Role และสิทธิ์", sub: "Roles & permissions", href: "/admin/roles", enabled: true, perm: "users:manage" },
-      { icon: Mail, label: "ตั้งค่าแจ้งเตือนอีเมล", sub: "Notifications", href: "/admin/notifications", enabled: true, perm: "notifications:manage" },
-      { icon: History, label: "Audit Trail", sub: "Audit log", href: "/admin/audit", enabled: true, perm: "audit:read" },
+      {
+        icon: Users,
+        label: 'จัดการผู้ใช้',
+        sub: 'Users',
+        href: '/admin/users',
+        enabled: true,
+        perm: 'users:manage',
+      },
+      {
+        icon: ShieldCheck,
+        label: 'Role และสิทธิ์',
+        sub: 'Roles & permissions',
+        href: '/admin/roles',
+        enabled: true,
+        perm: 'users:manage',
+      },
+      {
+        icon: Mail,
+        label: 'ตั้งค่าแจ้งเตือนอีเมล',
+        sub: 'Notifications',
+        href: '/admin/notifications',
+        enabled: true,
+        perm: 'notifications:manage',
+      },
+      {
+        icon: History,
+        label: 'Audit Trail',
+        sub: 'Audit log',
+        href: '/admin/audit-logs',
+        enabled: true,
+        perm: 'audit:read',
+      },
+      {
+        icon: FileText,
+        label: 'เทมเพลตอีเมล',
+        sub: 'Email templates',
+        href: '/admin/mail-templates',
+        enabled: true,
+        perm: 'mail-templates:manage',
+      },
     ],
   },
 ];
 
 // Links a role's sidebar layout (roles.menu_main, 0034) may list; "/admin" = open the Admin group.
-export const MENU_HREFS = [...NAV_SECTIONS[0].items.map((i) => i.href), "/admin"];
+export const MENU_HREFS = [...NAV_SECTIONS[0].items.map((i) => i.href), '/admin'];
 
 // A role's sidebar: its menu_main links on top ("งานของฉัน"), the other main links folded
 // under "อื่นๆ". View only — the sidebar still hides links the role has no permission for.
@@ -77,9 +149,17 @@ export function sectionsFor(menuMain?: string[] | null): NavSection[] {
   const mine = (menuMain ?? []).flatMap((h) => main.items.filter((i) => i.href === h));
   if (mine.length === 0) return NAV_SECTIONS;
   return [
-    { ...main, id: "mine", title: "งานของฉัน (My work)", items: mine },
-    { id: "more", title: "อื่นๆ (More)", collapsible: true, defaultCollapsed: true, items: main.items.filter((i) => !mine.includes(i)) },
-    ...rest.map((s) => (s.id === "admin" ? { ...s, defaultCollapsed: !menuMain!.includes("/admin") } : s)),
+    { ...main, id: 'mine', title: 'งานของฉัน (My work)', items: mine },
+    {
+      id: 'more',
+      title: 'อื่นๆ (More)',
+      collapsible: true,
+      defaultCollapsed: true,
+      items: main.items.filter((i) => !mine.includes(i)),
+    },
+    ...rest.map((s) =>
+      s.id === 'admin' ? { ...s, defaultCollapsed: !menuMain!.includes('/admin') } : s
+    ),
   ];
 }
 
@@ -89,7 +169,7 @@ export function findNavItem(pathname: string): NavItem | null {
   const all = NAV_SECTIONS.flatMap((s) => s.items);
   let best: NavItem | null = null;
   for (const item of all) {
-    if (pathname === item.href || pathname.startsWith(item.href + "/")) {
+    if (pathname === item.href || pathname.startsWith(item.href + '/')) {
       if (!best || item.href.length > best.href.length) best = item;
     }
   }

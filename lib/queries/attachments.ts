@@ -1,33 +1,53 @@
-import { createClient } from "@/lib/supabase/server";
-import { isDemoMode, isLocalStore } from "@/lib/env";
-import { listLocalAttachments } from "@/lib/local-store";
-import type { ReadingAttachment, StandardAttachment } from "@/lib/types";
+import { prisma } from '@/lib/prisma';
+import { siteWhere } from '@/lib/queries/permissions';
+import type { ReadingAttachment, StandardAttachment } from '@/lib/types';
+
+const READING = {
+  id: true,
+  asset_id: true,
+  period: true,
+  kind: true,
+  file_name: true,
+  storage_path: true,
+  mime_type: true,
+  size_bytes: true,
+  created_at: true,
+} as const;
 
 export async function listAttachments(
   assetId: string,
-  period?: string,
+  period?: string
 ): Promise<ReadingAttachment[]> {
-  if (isLocalStore()) return listLocalAttachments(assetId, period);
-  if (isDemoMode()) return [];
-  const supabase = createClient();
-  let query = supabase
-    .from("reading_attachments")
-    .select("*")
-    .eq("asset_id", assetId);
-  if (period) query = query.eq("period", period);
-  const { data, error } = await query.order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data ?? []) as ReadingAttachment[];
+  const rows = await prisma.readingAttachment.findMany({
+    where: {
+      asset_id: assetId,
+      is_deleted: false,
+      ...(period ? { period } : {}),
+      asset: await siteWhere(),
+    },
+    select: READING,
+    orderBy: { created_at: 'desc' },
+  });
+  return rows.map((r) => ({
+    ...r,
+    kind: r.kind as ReadingAttachment['kind'],
+    created_at: r.created_at.toISOString(),
+  }));
 }
 
 export async function listStandardAttachments(standardId: string): Promise<StandardAttachment[]> {
-  if (isDemoMode()) return []; // storage is real-mode only
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("standard_attachments")
-    .select("*")
-    .eq("standard_id", standardId)
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data ?? []) as StandardAttachment[];
+  const rows = await prisma.standardAttachment.findMany({
+    where: { standard_id: standardId, is_deleted: false },
+    select: {
+      id: true,
+      standard_id: true,
+      file_name: true,
+      storage_path: true,
+      mime_type: true,
+      size_bytes: true,
+      created_at: true,
+    },
+    orderBy: { created_at: 'desc' },
+  });
+  return rows.map((r) => ({ ...r, created_at: r.created_at.toISOString() }));
 }

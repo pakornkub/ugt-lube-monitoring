@@ -1,15 +1,15 @@
-"use server";
+'use server';
 
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/env";
-import { demoBlocked, runAction, type ActionResult } from "./result";
-import { requirePermission } from "./guards";
-import { logAudit } from "./audit-log";
+import { revalidatePath } from 'next/cache';
+import { prisma } from '@/lib/prisma';
+import { dateOnly, toDate } from '@/lib/db/json';
+import { runAction, type ActionResult } from './result';
+import { requireAssetPermission } from './guards';
+import { logAudit } from './audit-log';
 
 export async function addMaintenance(input: {
   assetId: string;
-  type: "pm" | "cm";
+  type: 'pm' | 'cm';
   work_date: string;
   wo_no: string;
   description: string;
@@ -17,11 +17,9 @@ export async function addMaintenance(input: {
   cost: number;
   technician: string;
 }): Promise<ActionResult> {
-  if (isDemoMode()) return demoBlocked();
   return runAction(async () => {
-    const auth = await requirePermission("maintenance:write");
+    const auth = await requireAssetPermission('maintenance:write', input.assetId);
     if (!auth.ok) return auth.error;
-    const supabase = createClient();
     const row = {
       type: input.type,
       work_date: input.work_date || null,
@@ -31,32 +29,53 @@ export async function addMaintenance(input: {
       cost: input.cost || 0,
       technician: input.technician || null,
     };
-    const { data, error } = await supabase.from("maintenance_records").insert({ asset_id: input.assetId, ...row }).select("id").single();
-    if (error) return { ok: false, message: error.message };
+    const created = await prisma.maintenanceRecord.create({
+      data: {
+        asset_id: input.assetId,
+        ...row,
+        work_date: toDate(row.work_date),
+        created_by: auth.userId,
+      },
+      select: { id: true },
+    });
     // "<asset>/maint/<id>": the machine's history tab finds it like a reading ("<asset>/<period>").
-    await logAudit({ action: "INSERT", table_name: "maintenance_records", record_id: `${input.assetId}/maint/${data.id}`, new_value: row });
+    await logAudit({
+      action: 'INSERT',
+      table_name: 'maintenance_records',
+      record_id: `${input.assetId}/maint/${created.id}`,
+      new_value: row,
+    });
     revalidatePath(`/assets/${input.assetId}`);
-    return { ok: true, message: "บันทึกประวัติการซ่อมบำรุงสำเร็จ" };
+    return { ok: true, message: 'บันทึกประวัติการซ่อมบำรุงสำเร็จ' };
   });
 }
 
 export async function deleteMaintenance(id: string, assetId: string): Promise<ActionResult> {
-  if (isDemoMode()) return demoBlocked();
   return runAction(async () => {
-    const auth = await requirePermission("maintenance:write");
+    const auth = await requireAssetPermission('maintenance:write', assetId);
     if (!auth.ok) return auth.error;
-    const supabase = createClient();
     // Read it first, so the history shows what was deleted.
-    const { data: before } = await supabase
-      .from("maintenance_records")
-      .select("type,work_date,wo_no,description,parts,cost,technician")
-      .eq("id", id)
-      .maybeSingle();
-    const { data: deleted, error } = await supabase.from("maintenance_records").delete().eq("id", id).select("id");
-    if (error) return { ok: false, message: error.message };
-    if (!deleted?.length) return { ok: false, message: "ไม่พบรายการนี้ หรือไม่มีสิทธิ์แก้ไขรายการของโรงงานนี้" };
-    await logAudit({ action: "DELETE", table_name: "maintenance_records", record_id: `${assetId}/maint/${id}`, old_value: before ?? undefined });
+    const before = await prisma.maintenanceRecord.findFirst({
+      where: { id, asset_id: assetId },
+      select: {
+        type: true,
+        work_date: true,
+        wo_no: true,
+        description: true,
+        parts: true,
+        cost: true,
+        technician: true,
+      },
+    });
+    if (!before) return { ok: false, message: 'ไม่พบรายการนี้ หรือไม่มีสิทธิ์แก้ไขรายการของโรงงานนี้' };
+    await prisma.maintenanceRecord.delete({ where: { id } });
+    await logAudit({
+      action: 'DELETE',
+      table_name: 'maintenance_records',
+      record_id: `${assetId}/maint/${id}`,
+      old_value: { ...before, work_date: dateOnly(before.work_date) },
+    });
     revalidatePath(`/assets/${assetId}`);
-    return { ok: true, message: "ลบรายการสำเร็จ" };
+    return { ok: true, message: 'ลบรายการสำเร็จ' };
   });
 }

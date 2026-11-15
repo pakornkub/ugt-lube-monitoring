@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { usePathname } from "next/navigation";
-import { findNavItem } from "@/lib/nav";
+import { usePathname } from 'next/navigation';
+import { findNavItem } from '@/lib/nav';
 
 export function PageTitle({ fallback }: { fallback: string }) {
   const pathname = usePathname();

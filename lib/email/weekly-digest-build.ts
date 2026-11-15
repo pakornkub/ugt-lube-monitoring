@@ -1,19 +1,20 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDashboardData } from "@/lib/queries/assets";
-import { getActionReasons } from "@/lib/queries/action-reasons";
-import { getLatestLabPeriods } from "@/lib/queries/readings";
-import { formatPeriodTh } from "@/lib/format";
-import { PER_PLANT, weeklyDigestEmail } from "./weekly-digest";
+import { getDashboardData } from '@/lib/queries/assets';
+import { getActionReasons } from '@/lib/queries/action-reasons';
+import { getLatestLabPeriods } from '@/lib/queries/readings';
+import { formatPeriodTh } from '@/lib/format';
+import { PER_PLANT, weeklyDigestEmail } from './weekly-digest';
 
 // The weekly digest from live data — one builder for the Monday cron and the manual
-// preview / send buttons, so both send the same email. `supabase`: the service-role
-// client (the whole fleet, like the cron); omitted in Demo Mode.
-export async function buildWeeklyDigest(supabase?: SupabaseClient): Promise<{ subject: string; html: string }> {
-  const { data } = await getDashboardData("", supabase);
+// preview / send buttons, so both send the same email. `unscoped`: the whole fleet
+// (the cron, which has no session); otherwise the caller's own plants.
+export async function buildWeeklyDigest(
+  unscoped = false
+): Promise<{ subject: string; html: string }> {
+  const { data } = await getDashboardData('', unscoped);
   // each plant's worst machines (not the fleet's), at most PER_PLANT, so every plant manager finds their own
   const shown = new Map<string, number>();
   const top = data.scopedAssets
-    .filter((a) => a.status !== "Healthy")
+    .filter((a) => a.status !== 'Healthy')
     .sort((a, b) => a.health - b.health)
     .filter((a) => {
       const n = shown.get(a.site) ?? 0;
@@ -21,8 +22,11 @@ export async function buildWeeklyDigest(supabase?: SupabaseClient): Promise<{ su
       return n < PER_PLANT;
     });
   const [reasons, lab] = await Promise.all([
-    getActionReasons(top, supabase),
-    getLatestLabPeriods(top.map((a) => a.id), supabase),
+    getActionReasons(top, unscoped),
+    getLatestLabPeriods(
+      top.map((a) => a.id),
+      unscoped
+    ),
   ]);
   return weeklyDigestEmail({
     totalAssets: data.kpis.total,
@@ -41,12 +45,12 @@ export async function buildWeeklyDigest(supabase?: SupabaseClient): Promise<{ su
         // the same lines as the Dashboard's action list: the badge minus its level word (the dot shows it)
         readings: advice.slice(0, 3).map((r) => ({
           label: r.label,
-          over: r.badge.replace(/^(วิกฤต|เฝ้าระวัง)\s*/, "") || r.badge,
+          over: r.badge.replace(/^(วิกฤต|เฝ้าระวัง)\s*/, '') || r.badge,
           limit: r.limit,
-          crit: r.level === "crit",
+          crit: r.level === 'crit',
         })),
         action: advice[0]?.action,
-        lab: lab[a.id] ? formatPeriodTh(lab[a.id]) : "",
+        lab: lab[a.id] ? formatPeriodTh(lab[a.id]) : '',
         cause: reasons[a.id]?.notes[0],
       };
     }),

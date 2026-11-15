@@ -10,11 +10,11 @@ export interface MatchCandidate {
 }
 
 export type TagMatch =
-  | { kind: "exact" | "normalized"; id: string; suggestions: MatchCandidate[] }
-  | { kind: "suggest" | "none" | "empty"; id: null; suggestions: MatchCandidate[] };
+  | { kind: 'exact' | 'normalized'; id: string; suggestions: MatchCandidate[] }
+  | { kind: 'suggest' | 'none' | 'empty'; id: null; suggestions: MatchCandidate[] };
 
 export function normalizeTag(s: string): string {
-  return s.toUpperCase().replace(/[\s\-_./\\]+/g, "");
+  return s.toUpperCase().replace(/[\s\-_./\\]+/g, '');
 }
 
 function distance(a: string, b: string): number {
@@ -37,7 +37,8 @@ function similarity(a: string, b: string): number {
   if (!a || !b) return 0;
   if (a === b) return 1;
   // one contains the other (lab added a prefix/suffix) — scored by how much is shared
-  if (a.includes(b) || b.includes(a)) return 0.75 + 0.2 * (Math.min(a.length, b.length) / Math.max(a.length, b.length));
+  if (a.includes(b) || b.includes(a))
+    return 0.75 + 0.2 * (Math.min(a.length, b.length) / Math.max(a.length, b.length));
   return 1 - distance(a, b) / Math.max(a.length, b.length);
 }
 
@@ -69,24 +70,28 @@ function indexOf(assets: MatchCandidate[]): Indexed {
 }
 
 export function matchTag(tag: string | null | undefined, assets: MatchCandidate[]): TagMatch {
-  const raw = String(tag ?? "").trim();
-  if (!raw) return { kind: "empty", id: null, suggestions: [] };
+  const raw = String(tag ?? '').trim();
+  if (!raw) return { kind: 'empty', id: null, suggestions: [] };
 
   const ix = indexOf(assets);
   const exact = ix.byId.get(raw);
-  if (exact) return { kind: "exact", id: exact.id, suggestions: [] };
+  if (exact) return { kind: 'exact', id: exact.id, suggestions: [] };
 
   const key = normalizeTag(raw);
   const same = ix.byKey.get(key) ?? [];
-  if (same.length === 1) return { kind: "normalized", id: same[0].id, suggestions: [] };
+  if (same.length === 1) return { kind: 'normalized', id: same[0].id, suggestions: [] };
 
   const scored = ix.keys
-    .map(({ a, id, name }) => ({ a, s: Math.max(similarity(key, id), similarity(key, name) - 0.05) }))
+    .map(({ a, id, name }) => ({
+      a,
+      s: Math.max(similarity(key, id), similarity(key, name) - 0.05),
+    }))
     .filter((x) => x.s >= SUGGEST_MIN)
     .sort((x, y) => y.s - x.s || x.a.id.localeCompare(y.a.id))
     .slice(0, 3)
     .map((x) => x.a);
   // several assets collapse to the same normalized id → never auto-pick, offer them all
-  const suggestions = same.length > 1 ? [...same, ...scored.filter((s) => !same.includes(s))].slice(0, 3) : scored;
-  return { kind: suggestions.length ? "suggest" : "none", id: null, suggestions };
+  const suggestions =
+    same.length > 1 ? [...same, ...scored.filter((s) => !same.includes(s))].slice(0, 3) : scored;
+  return { kind: suggestions.length ? 'suggest' : 'none', id: null, suggestions };
 }

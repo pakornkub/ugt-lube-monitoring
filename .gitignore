@@ -33,3 +33,13 @@ next-env.d.ts
 
 # Local Store data (readings + uploaded lab files) — real data, never commit
 /.local-data/
+
+# test artifacts
+coverage/
+test-results/
+# uploaded files (dev STORAGE_ROOT)
+/storage/
+.env.dev
+.env.local
+# Claude Code audit logs (not committed)
+.claude/logs/

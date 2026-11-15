@@ -3,15 +3,15 @@
 > **Ready-to-copy snippet สำหรับ Antigravity stacking with Kilo Code + GLM-5**
 > วางเอกสารนี้ทั้งหมดเป็น master spec / context รอบที่ 1 (PRD), แล้วใช้ Phase Prompt (P0 → P1 → P2) ในส่วนท้ายเป็น context รอบถัดไปเพื่อ implement เป็นลำดับ
 
-| ฟิลด์ | ค่า |
-|---|---|
-| **ชื่อโปรเจกต์** | UGT Reliability Lube Monitoring (เวอร์ชันสร้างจริง v3; เดิมชื่อ Lubrication AI Platform — เปลี่ยน 2026-11-04) |
-| **ต้นแบบอ้างอิง (Reference UI/UX)** | `HTML/Lubrication_monitoring_final2 (1).html` — สร้าง parity ฟีเจอร์และสูตรคำนวณเท่าต้นแบบ |
-| **Stack** | Next.js 14+ (App Router) · React 18 · TypeScript · Tailwind CSS · Supabase (Postgres + Auth + RLS + Storage) · Vercel (Hosting) |
-| **AI** | Multi-provider pluggable (GLM-5 / OpenAI / Anthropic) เรียกผ่าน Route Handler ฝั่ง server เท่านั้น |
-| **ภาษา UI** | ไทย/อังกฤษ (bilingual) — เหมือนต้นแบบ |
-| **ผู้ใช้เป้าหมาย** | Reliability Engineer, Maintenance Manager, Planner, Technician, Plant Manager |
-| **เฟสวางจำหน่าย** | P0 (Foundation + Core CM) · P1 (PM Operations) · P2 (Executive + AI) |
+| ฟิลด์                              | ค่า                                                                                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **ชื่อโปรเจกต์**                    | UGT Reliability Lube Monitoring (เวอร์ชันสร้างจริง v3; เดิมชื่อ Lubrication AI Platform — เปลี่ยน 2026-11-04)                            |
+| **ต้นแบบอ้างอิง (Reference UI/UX)** | `HTML/Lubrication_monitoring_final2 (1).html` — สร้าง parity ฟีเจอร์และสูตรคำนวณเท่าต้นแบบ                                            |
+| **Stack**                        | Next.js 14+ (App Router) · React 18 · TypeScript · Tailwind CSS · Supabase (Postgres + Auth + RLS + Storage) · Vercel (Hosting) |
+| **AI**                           | Multi-provider pluggable (GLM-5 / OpenAI / Anthropic) เรียกผ่าน Route Handler ฝั่ง server เท่านั้น                                     |
+| **ภาษา UI**                      | ไทย/อังกฤษ (bilingual) — เหมือนต้นแบบ                                                                                              |
+| **ผู้ใช้เป้าหมาย**                   | Reliability Engineer, Maintenance Manager, Planner, Technician, Plant Manager                                                   |
+| **เฟสวางจำหน่าย**                 | P0 (Foundation + Core CM) · P1 (PM Operations) · P2 (Executive + AI)                                                            |
 
 ---
 
@@ -29,6 +29,7 @@
 แพลตฟอร์ม Condition Monitoring สำหรับโรงงานอุตสาหกรรม ผสาน **Oil Analysis + Vibration Analysis** เพื่อคำนวณ Health Score ของเครื่องจักรแบบ real-time เน้น **Lubrication Monitoring** อย่างเดียว: ติดตามความเสี่ยงระดับกองเครื่องจักร → วิเคราะห์เชิงลึกรายเครื่อง → ป้อนข้อมูลแล็บ → รอบเก็บตัวอย่างน้ำมัน → รายงานผู้บริหาร และ AI Diagnostic (โมดูล PM / Work Order / งบประมาณ / EAM / AI Reliability ถอดออกเมื่อ 2026-10-28 — งานซ่อมเปิดในระบบอื่น)
 
 จุดเด่นเชิงโดเมน:
+
 - **Health Score algorithm โปร่งใส** — คำนวณจากขีดจำกัด (threshold) ที่ผู้ใช้กำหนดได้ มี audit log แสดงการหักคะแนนทุกข้อ
 - **Single scoring formula** — ทุกหน้า (Dashboard, Watchlist, Drill-down, Alarm Audit) ใช้สูตรเดียวกัน
 - **มาตรฐานวิศวกรรมฝัง** — คลัง ISO/ASTM/SAE/API เชื่อมโยงกับเกณฑ์การตัดคะแนน
@@ -38,6 +39,7 @@
 ## 2. เป้าหมายและขอบเขต (Goals & Non-Goals)
 
 ### ✅ Goals
+
 - สร้างแอปจริงบน Next.js + Supabase ที่มีฟีเจอร์ Lubrication Monitoring ตามต้นแบบ HTML (โมดูล 1–8 + §7.17)
 - ข้อมูลถาวรใน Supabase Postgres พร้อม Row Level Security แยกตาม Site/บทบาท
 - Health Score คำนวณฝั่ง server (DB function / API) เพื่อ consistency ทั้งระบบ
@@ -45,6 +47,7 @@
 - Deploy บน Vercel, รองรับ PDF/CSV/JSON export
 
 ### ⛔ Non-Goals (ออกจาก v1)
+
 - ไม่ต้องเชื่อมต่อ IoT sensor / SCADA แบบ realtime stream (ข้อมูลเข้าทาง Manual Data Entry + import เหมือนต้นแบบ)
 - ไม่ต้องเขียน ML model ฝังตัวเอง — AI Diagnostic ใช้ LLM provider ภายนอก
 - ไม่ต้องมี mobile native app (responsive web พอ)
@@ -79,6 +82,7 @@
 ```
 
 ### การจัดการ environment variables (Vercel)
+
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
@@ -94,14 +98,16 @@ NEXT_PUBLIC_APP_URL=
 ## 4. Authentication & Role-Based Access Control (RBAC)
 
 ### บทบาท (roles)
-| Role | สิทธิ์ |
-|---|---|
-| `admin` | ทุกฟีเจอร์ + จัดการผู้ใช้ + ลบข้อมูลทั้งหมด + import/export |
-| `engineer` | ป้อนข้อมูลแล็บ, แก้ไขเครื่องจักร, ตั้งค่า alarm, สร้าง WO/PM, ดูรายงาน |
-| `manager` | ดูทุกหน้า + export รายงาน + จัดการงบประมาณ (แก้ไขจำกัด — ไม่ลบ asset) |
-| `viewer` | ดู Dashboard/Watchlist/รายงานแบบ read-only |
+
+| Role       | สิทธิ์                                                            |
+| ---------- | -------------------------------------------------------------- |
+| `admin`    | ทุกฟีเจอร์ + จัดการผู้ใช้ + ลบข้อมูลทั้งหมด + import/export               |
+| `engineer` | ป้อนข้อมูลแล็บ, แก้ไขเครื่องจักร, ตั้งค่า alarm, สร้าง WO/PM, ดูรายงาน      |
+| `manager`  | ดูทุกหน้า + export รายงาน + จัดการงบประมาณ (แก้ไขจำกัด — ไม่ลบ asset) |
+| `viewer`   | ดู Dashboard/Watchlist/รายงานแบบ read-only                      |
 
 ### ตาราง `profiles`
+
 ```sql
 create table profiles (
   id uuid primary key references auth.users on delete cascade,
@@ -114,6 +120,7 @@ create table profiles (
 ```
 
 ### RLS policy pattern
+
 - ทุกตารางที่มี `site` column ต้องมี policy: user ที่ไม่ใช่ admin เห็นเฉพาะ row ที่ `site = any(current_user_site_access)` หรือ `site_access = '{}'`
 - `admin` เห็นทุก row
 - `viewer` = SELECT เท่านั้น
@@ -126,6 +133,7 @@ create table profiles (
 > IDs ใช้รูปแบบตามต้นแบบ (`RE-1001`, `WO-50000`, `PM-001`, `AL-1000`, `EXP-...`, `AP-2026-001`) เก็บเป็น `text` primary key เพื่อ parity กับ UI/แล็บเดิม และสร้างทาง application logic
 
 ### 5.1 Sites & Reference Data
+
 ```sql
 -- Plant codes (ต้นแบบ): UT, PCD, SA, TSL, NY1
 create table sites (
@@ -143,6 +151,7 @@ create table asset_types (
 ```
 
 ### 5.2 Assets (เครื่องจักร) — entity หลัก
+
 ```sql
 create table assets (
   id text primary key,              -- 'RE-1001'
@@ -169,6 +178,7 @@ create index on assets (status);
 ```
 
 ### 5.3 Oil & Vibration Readings (time-series)
+
 ```sql
 create table oil_readings (
   id uuid primary key default gen_random_uuid(),
@@ -195,6 +205,7 @@ create index on vib_readings (asset_id, period);
 ```
 
 ### 5.4 Maintenance History
+
 ```sql
 create table maintenance_records (
   id uuid primary key default gen_random_uuid(),
@@ -211,6 +222,7 @@ create table maintenance_records (
 ```
 
 ### 5.5 Alarm / Threshold Configuration (single source of truth)
+
 ```sql
 create table alarm_params (
   id uuid primary key default gen_random_uuid(),
@@ -232,29 +244,34 @@ create table score_config (
   crit_penalty numeric default 30   -- deduction at crit_limit
 );
 ```
+
 **Seed defaults (parity ต้นแบบ):**
 
 Oil params (`OIL_P`):
-| key | name | unit | warn | crit |
-|---|---|---|---|---|
-| fe | Iron (Fe) | ppm | 100 | 200 |
-| water | Water Content | ppm | 500 | 1000 |
-| tan | TAN | mgKOH/g | 0.5 | 1.0 |
+
+| key   | name          | unit    | warn | crit |
+| ----- | ------------- | ------- | ---- | ---- |
+| fe    | Iron (Fe)     | ppm     | 100  | 200  |
+| water | Water Content | ppm     | 500  | 1000 |
+| tan   | TAN           | mgKOH/g | 0.5  | 1.0  |
 
 Copper (Cu) และ Silicon (Si) ถูกถอดออกเมื่อ 2026-10-28 (`0031_drop_cu_si_params.sql`) เพราะผลแล็บของโรงงานไม่ได้วัดสองค่านี้ — ไม่มีช่องกรอก ไม่อ่านจาก Excel และไม่หักคะแนน คอลัมน์ `oil_readings.cu` / `.si` ยังอยู่พร้อมข้อมูลเดิม
 
 Vib params (`VIB_P`):
-| key | name | unit | warn | crit |
-|---|---|---|---|---|
-| vel | Velocity RMS | mm/s | 4.5 | 7.1 |
-| acc | Peak Acceleration | g-PK | 5 | 10 |
+
+| key | name              | unit | warn | crit |
+| --- | ----------------- | ---- | ---- | ---- |
+| vel | Velocity RMS      | mm/s | 4.5  | 7.1  |
+| acc | Peak Acceleration | g-PK | 5    | 10   |
 
 Score config: oil_weight 100, vib_weight 0, warn_penalty 15, crit_penalty 30. (ต้นแบบเดิมเป็น 60/40 — เปลี่ยนใน `0024_default_oil_weighting.sql` เพราะโรงงานเริ่มจากวัดน้ำมันอย่างเดียว)
 
 Viscosity ไม่ใช้ warn/crit ในตาราง แต่คิดจากเกรด ISO VG ของแต่ละเครื่อง (ISO 3448): Warning นอกช่วง ±5%, Critical นอกช่วง ±10% ทั้งด้านสูงและต่ำ (ดู §6)
 
 ### 5.6 PM Tasks
+
 > **ถอดออกแล้ว (2026-10-28)** — ตารางนี้ยังอยู่ในฐานข้อมูลพร้อมข้อมูลเดิม แต่ไม่มีโมดูลในแอปใช้แล้ว และ `0029_retire_pm_permissions.sql` ถอนสิทธิ์ที่เกี่ยวข้อง (spec: `docs/superpowers/specs/2026-10-28-remove-pm-modules-design.md`)
+
 ```sql
 create table pm_tasks (
   id text primary key,              -- 'PM-001'
@@ -278,7 +295,9 @@ create table pm_tasks (
 ```
 
 ### 5.7 Work Orders
+
 > **ถอดออกแล้ว (2026-10-28)** — ตารางนี้ยังอยู่ในฐานข้อมูลพร้อมข้อมูลเดิม แต่ไม่มีโมดูลในแอปใช้แล้ว และ `0029_retire_pm_permissions.sql` ถอนสิทธิ์ที่เกี่ยวข้อง (spec: `docs/superpowers/specs/2026-10-28-remove-pm-modules-design.md`)
+
 ```sql
 create table work_orders (
   id text primary key,              -- 'WO-50000'
@@ -298,7 +317,9 @@ create table work_orders (
 ```
 
 ### 5.8 Alerts
+
 > **ถอดออกแล้ว (2026-10-28)** — ตารางนี้ยังอยู่ในฐานข้อมูลพร้อมข้อมูลเดิม แต่ไม่มีโมดูลในแอปใช้แล้ว และ `0029_retire_pm_permissions.sql` ถอนสิทธิ์ที่เกี่ยวข้อง (spec: `docs/superpowers/specs/2026-10-28-remove-pm-modules-design.md`)
+
 ```sql
 create table alerts (
   id text primary key,              -- 'AL-1000'
@@ -314,6 +335,7 @@ create table alerts (
 ```
 
 ### 5.9 Standards Library
+
 ```sql
 create table standards (
   id uuid primary key default gen_random_uuid(),
@@ -326,10 +348,13 @@ create table standards (
   created_at timestamptz default now()
 );
 ```
+
 > Seed มาตรฐานอย่างน้อย 4 ฉบับ (ISO 4406:2021, ASTM D4378-20, ISO 10816-3:2009, AGMA 9005-F16, ISO 17359:2018) ตามเนื้อหาในต้นแบบ
 
 ### 5.10 Budget
+
 > **ถอดออกแล้ว (2026-10-28)** — ตารางนี้ยังอยู่ในฐานข้อมูลพร้อมข้อมูลเดิม แต่ไม่มีโมดูลในแอปใช้แล้ว และ `0029_retire_pm_permissions.sql` ถอนสิทธิ์ที่เกี่ยวข้อง (spec: `docs/superpowers/specs/2026-10-28-remove-pm-modules-design.md`)
+
 ```sql
 create table budget_config (
   id int primary key default 1,
@@ -400,10 +425,12 @@ status    = health < 40 ? 'Critical'
 ```
 
 ### ทริกเกอร์คำนวณใหม่
+
 - เมื่อ insert/update `oil_readings`, `vib_readings`
 - เมื่อ update `alarm_params` หรือ `score_config` → recompute ทุก asset (เหมือนปุ่ม "บันทึก" ในต้นแบบที่คำนวณใหม่ทั้งระบบ)
 
 ### Health Score Audit (Deduction Breakdown)
+
 แสดงรายการแยกหมวด Oil / Vibration: พารามิเตอร์ · เหตุผล · ค่าที่อ่านได้ · penalty พร้อมคะแนนของแต่ละหมวด แล้วรวมเป็น `(oilScore × oil_weight% + vibScore × vib_weight%) ÷ 100 = netScore` (เหมือนกันทั้งหน้า Alarm Config และ Drill-down > Health tab)
 
 คะแนนเครื่องจักรติดลบไม่ได้: คะแนนแต่ละหมวดต่ำสุดคือ 0 และรายการที่หักในหมวดเดียวกันต้องรวมกันไม่เกิน 100 (หักจากรายการที่หักมากที่สุดก่อน รายการที่หักไม่ได้เต็มจำนวนจะแสดงค่าที่หักจริงพร้อมเกณฑ์เต็ม) ฐานข้อมูลบังคับ `assets.health` ให้อยู่ระหว่าง 0–100 (`0028_health_range_check.sql`)
@@ -416,29 +443,30 @@ status    = health < 40 ? 'Critical'
 
 ### Module Map & Release Phase
 
-| # | โมดูล | Route | Phase |
-|---|---|---|---|
-| 1 | Fleet Risk Center (Dashboard) | `/dashboard` | P0 |
-| 2 | Asset Watchlist | `/watchlist` | P0 |
-| 3 | Drill-down Analysis | `/assets/[id]` | P0 |
-| 4 | Data Entry (Oil/Vib) | `/data-entry` | P0 |
-| 5 | Asset Database | `/assets` (CRUD) | P0 |
-| 6 | Standards Library | `/standards` | P0 |
-| 7 | Alarm Configuration | `/config/alarms` | P0 |
-| 8 | Board-Level Reports | `/reports` | P0 (basic) → P2 (full) |
-| 9 | ~~PM Compliance Hub~~ | ~~`/pm/compliance`~~ | ถอดออก 2026-10-28 |
-| 10 | ~~PM Calendar~~ | ~~`/pm/calendar`~~ | ถอดออก 2026-10-28 |
-| 11 | ~~Work Orders~~ | ~~`/work-orders`~~ | ถอดออก 2026-10-28 |
-| 12 | ~~PM Master Setup~~ | ~~`/pm/setup`~~ | ถอดออก 2026-10-28 |
-| 13 | ~~PM Alert Center~~ | ~~`/pm/alerts`~~ | ถอดออก 2026-10-28 |
-| 14 | ~~EAM/CMMS Reporting Center~~ | ~~`/eam`~~ | ถอดออก 2026-10-28 |
-| 15 | ~~AI Reliability Center (RUL)~~ | ~~`/ai-reliability`~~ | ถอดออก 2026-10-28 |
-| 16 | ~~Budget Tracker~~ | ~~`/budget`~~ | ถอดออก 2026-10-28 |
-| 17 | ~~Oil Sampling Cycle (รอบเก็บตัวอย่างน้ำมัน)~~ | ~~`/sampling`~~ | ถอดออก 2026-10-28 |
+| #   | โมดูล                                      | Route                 | Phase                  |
+| --- | ----------------------------------------- | --------------------- | ---------------------- |
+| 1   | Fleet Risk Center (Dashboard)             | `/dashboard`          | P0                     |
+| 2   | Asset Watchlist                           | `/watchlist`          | P0                     |
+| 3   | Drill-down Analysis                       | `/assets/[id]`        | P0                     |
+| 4   | Data Entry (Oil/Vib)                      | `/data-entry`         | P0                     |
+| 5   | Asset Database                            | `/assets` (CRUD)      | P0                     |
+| 6   | Standards Library                         | `/standards`          | P0                     |
+| 7   | Alarm Configuration                       | `/config/alarms`      | P0                     |
+| 8   | Board-Level Reports                       | `/reports`            | P0 (basic) → P2 (full) |
+| 9   | ~~PM Compliance Hub~~                     | ~~`/pm/compliance`~~  | ถอดออก 2026-10-28      |
+| 10  | ~~PM Calendar~~                           | ~~`/pm/calendar`~~    | ถอดออก 2026-10-28      |
+| 11  | ~~Work Orders~~                           | ~~`/work-orders`~~    | ถอดออก 2026-10-28      |
+| 12  | ~~PM Master Setup~~                       | ~~`/pm/setup`~~       | ถอดออก 2026-10-28      |
+| 13  | ~~PM Alert Center~~                       | ~~`/pm/alerts`~~      | ถอดออก 2026-10-28      |
+| 14  | ~~EAM/CMMS Reporting Center~~             | ~~`/eam`~~            | ถอดออก 2026-10-28      |
+| 15  | ~~AI Reliability Center (RUL)~~           | ~~`/ai-reliability`~~ | ถอดออก 2026-10-28      |
+| 16  | ~~Budget Tracker~~                        | ~~`/budget`~~         | ถอดออก 2026-10-28      |
+| 17  | ~~Oil Sampling Cycle (รอบเก็บตัวอย่างน้ำมัน)~~ | ~~`/sampling`~~       | ถอดออก 2026-10-28      |
 
 ---
 
 ### 7.1 Fleet Risk Center (Dashboard) — P0
+
 **ผู้ใช้:** ทุกบทบาท | **Parity:** dashboard ในไฟล์ `pg-dash`
 
 - **KPI cards (4):** สินทรัพย์รวม / วิกฤต / เฝ้าระวัง / ปกติ (อ่านจาก `assets.status`)
@@ -449,6 +477,7 @@ status    = health < 40 ? 'Critical'
 - **Fleet summary table:** ค้นหา + filter status + pagination (20/หน้า) + ปุ่ม "วิเคราะห์"
 
 ### 7.2 Asset Watchlist — P0
+
 **Parity:** `pg-watch`
 
 - Filter: site, ค้นหา ID/ชื่อ, status tab (ทั้งหมด/วิกฤต/เฝ้าระวัง/ปกติ), เรียง health น้อย→มาก
@@ -456,11 +485,13 @@ status    = health < 40 ? 'Critical'
 - Pagination 20/หน้า
 
 ### 7.3 Drill-down Analysis — P0
+
 **Route:** `/assets/[id]` | **Parity:** `pg-detail` (renderDetail)
 
 Header: ชื่อ · status badge · type · site · run-hours · Health Index · last update · ปุ่ม Export + AI
 
 **6 แท็บ (ต้องครบ):**
+
 1. **Wear** — trend line chart (Fe/Cu/Si) + ผลแล็บล่าสุด (Fe, Cu, Si, ISO Cleanliness) พร้อม warning/critical limit
 2. **Oil** — trend (Viscosity/Water) + KPI (Viscosity, Water, TAN) + **Lubrication Master Data** (ชนิดน้ำมัน, ปริมาณ, รอบเปลี่ยน/เก็บตัวอย่าง) + สถานะครบกำหนดเปลี่ยนถ่าย/เก็บตัวอย่าง (ปกติ/ใกล้ครบ/เลยกำหนด)
 3. **Vibration** — history chart (Velocity bar + Peak Accel line) + KPI (Velocity RMS, Peak Acceleration) vs ISO 10816-3 limit
@@ -469,6 +500,7 @@ Header: ชื่อ · status badge · type · site · run-hours · Health Inde
 6. **Intelligence** — RCA Failure Mode Probability bar (Bearing Fatigue/Lube Failure/Misalignment/Imbalance/Seal Wear/Contamination) + ข้อมูลจำเพาะ + **AI Diagnostic panel**
 
 ### 7.4 Data Entry (Oil/Vib) — P0
+
 **Parity:** `pg-input` + `diSubmit`
 
 - ค้นหา + filter site + เลือกเครื่องจักร (แสดง 50 รายการแรก)
@@ -485,6 +517,7 @@ Header: ชื่อ · status badge · type · site · run-hours · Health Inde
   - Batch: แต่ละแถวมีสถานะ พร้อม / ต้องตรวจ / ข้าม (ไม่มีค่าผลตรวจ) นำเข้าเฉพาะแถวที่พร้อม แถวที่เหลือยังอยู่ให้แก้แล้วนำเข้าต่อ
 
 ### 7.5 Asset Database (CRUD) — P0
+
 **Parity:** `pg-db` + modals
 
 - Table: checkbox (bulk delete), ID, ชื่อ, type badge, site, last update, actions (ดู/แก้ไข/ลบ)
@@ -494,6 +527,7 @@ Header: ชื่อ · status badge · type · site · run-hours · Health Inde
 - **Import/Export JSON** (parity `dbImport`/`dbExport`) + Delete all + Bulk delete
 
 ### 7.6 Standards Library — P0
+
 **Parity:** `pg-std`
 
 - Grid card 3 col · filter category (TRIBOLOGY/VIBRATION/RELIABILITY/ASSET/CUSTOM) + ค้นหา
@@ -502,6 +536,7 @@ Header: ชื่อ · status badge · type · site · run-hours · Health Inde
 - **Add modal:** title, category, subtitle, description (TH), full text, tags (comma-separated)
 
 ### 7.7 Alarm Configuration — P0
+
 **Parity:** `pg-alarm`
 
 - **Health Score Audit:** เลือก asset → แสดง deduction breakdown + net score (real-time)
@@ -512,6 +547,7 @@ Header: ชื่อ · status badge · type · site · run-hours · Health Inde
 - Notice: การแก้ limit มีผลต่อ health/status ทุกเครื่องทันที
 
 ### 7.8 Board-Level Reports — P0 (basic) → P2 (full PDF)
+
 **Parity:** `pg-report`
 
 - Config: site (ทุกโรงงาน หรือโรงงานเดียว — ทั้งรายงานพูดถึงขอบเขตนั้น), report type ตามคนอ่าน: **Executive Summary** (ผู้บริหาร, 1 หน้า) / **Plant Report** (ผู้จัดการโรงงาน) / **Oil Analysis Technical Report** (วิศวกร), prepared/reviewed/approved by, หมายเหตุผู้จัดทำ — ยังไม่มีตัวกรองช่วงเวลา: รายงานแสดงสถานะล่าสุด ("ข้อมูล ณ วันที่")
@@ -521,6 +557,7 @@ Header: ชื่อ · status badge · type · site · run-hours · Health Inde
 - ไม่มีบทสรุปจาก AI (ถอดออก 2026-11-06 — ข้อความจากข้อมูลจริงเท่านั้น)
 
 ### 7.9–7.16 (ถอดออกแล้ว)
+
 PM Compliance Hub, PM Calendar, Work Orders, PM Master Setup, PM Alert Center, EAM Reporting, AI Reliability Center และ Budget Tracker (รวม AI Fleet Chat) ถูกถอดออกจากแอปเมื่อ 2026-10-28 — ดู `docs/superpowers/specs/2026-10-28-remove-pm-modules-design.md` และ git history สำหรับ spec เดิม เมื่อผลแล็บเกินเกณฑ์ หน้า Data Entry แสดง "ค่าเกินเกณฑ์ ควรเปิดงานซ่อม" แทนการสร้าง Work Order
 
 ### 7.17 ~~Oil Sampling Cycle (รอบเก็บตัวอย่างน้ำมัน)~~ — ถอดออก 2026-10-28
@@ -532,27 +569,35 @@ PM Compliance Hub, PM Calendar, Work Orders, PM Master Setup, PM Alert Center, E
 ## 8. AI Integration (Multi-Provider)
 
 ### ทางเข้า: `POST /api/ai/diagnose` (Route Handler, server-only)
+
 - รับ `{ assetId }` → ดึงข้อมูล asset + latest oil/vib + thresholds จาก Supabase (service role)
 - เลือก provider ตาม `AI_PROVIDER` env
 - สร้าง prompt (parity ต้นแบบ) ส่งให้ LLM, parse JSON response
 
 ### Provider abstraction
+
 ```ts
 // lib/ai/provider.ts
-type AIProvider = { diagnose(payload: DiagnoseInput): Promise<DiagnoseResult> }
+type AIProvider = { diagnose(payload: DiagnoseInput): Promise<DiagnoseResult> };
 // lib/ai/{glm,openai,anthropic}.ts  — implement AIProvider แต่ละตัว
 // ทุก provider ต้อง return schema เดียวกัน:
 type DiagnoseResult = {
-  summary, primaryAnomaly, confidencePct,
-  oilAnalysis, vibrationAnalysis, rootCauseHypothesis,
-  actionPlan: { immediate: string[], shortTerm: string[], longTerm: string[] }
-}
+  summary;
+  primaryAnomaly;
+  confidencePct;
+  oilAnalysis;
+  vibrationAnalysis;
+  rootCauseHypothesis;
+  actionPlan: { immediate: string[]; shortTerm: string[]; longTerm: string[] };
+};
 ```
+
 - **GLM (default):** model `glm-5.2`, ใช้ zai/glm endpoint
 - API key เก็บใน `AI_API_KEY` (server env) — **ห้าม expose สู่ client**
 - Fallback: หาก provider ล้มเหลว แสดงข้อความ error + (optional) rule-based RCA
 
 ### จุดใช้งาน
+
 - Drill-down > Intelligence tab (per-asset diagnostic, RCA)
 - Reports > Executive AI Summary
 - Standards Library > AI standard lookup
@@ -562,20 +607,23 @@ type DiagnoseResult = {
 ## 9. Design System (parity ต้นแบบ Apple-style)
 
 ### Color tokens (เทียบเท่า Tailwind config)
-| Token | Hex | การใช้ |
-|---|---|---|
-| bg / bg2 / bg3 | #f5f5f7 / #ffffff / #fafafc | พื้นหลัง, การ์ด |
-| border | #e0e0e0 | เส้นขอบ |
-| cyan / cyan-dark / cyan-focus | #0066cc / #2997ff / #0071e3 | primary, sidebar accent |
-| green / yellow / red | #22c55e / #f59e0b / #ef4444 | Healthy / Warning / Critical |
-| purple / pink | #8b5cf6 / #e0559a | Vibration / accent |
-| t1 / t2 / t3 | #1d1d1f / #333333 / #7a7a7a | text 1/2/3 |
+
+| Token                         | Hex                         | การใช้                        |
+| ----------------------------- | --------------------------- | ---------------------------- |
+| bg / bg2 / bg3                | #f5f5f7 / #ffffff / #fafafc | พื้นหลัง, การ์ด                  |
+| border                        | #e0e0e0                     | เส้นขอบ                       |
+| cyan / cyan-dark / cyan-focus | #0066cc / #2997ff / #0071e3 | primary, sidebar accent      |
+| green / yellow / red          | #22c55e / #f59e0b / #ef4444 | Healthy / Warning / Critical |
+| purple / pink                 | #8b5cf6 / #e0559a           | Vibration / accent           |
+| t1 / t2 / t3                  | #1d1d1f / #333333 / #7a7a7a | text 1/2/3                   |
 
 ### Typography
+
 - Display/Text: Inter / SF Pro (system-ui fallback)
 - Mono (IDs, ตัวเลข): JetBrains Mono
 
 ### Layout components (สร้างเป็น React components)
+
 - `Sidebar` (174px, ดำ, 2 ส่วน: MAIN MODULES + PM MANAGEMENT CENTER, status footer)
 - `Topbar` (50px, frosted glass, title + active plant + notification bell + avatar)
 - `KpiGrid` / `KpiCard` (top accent bar ตาม status)
@@ -584,6 +632,7 @@ type DiagnoseResult = {
 - Notification panel (bell dropdown)
 
 ### Status conventions (parity)
+
 - Health: <40 Critical (red) · <80 Warning (yellow) · ≥80 Healthy (green)
 - Asset type color map (parity `TC`)
 - Responsive: grid degrade ที่ ≤1100px และ ≤760px (sidebar 60px collapse)
@@ -592,19 +641,20 @@ type DiagnoseResult = {
 
 ## 10. Non-Functional Requirements
 
-| ด้าน | ข้อกำหนด |
-|---|---|
-| **Performance** | หน้า Dashboard/Watchlist load < 2s สำหรับ 500 assets; pagination 20/หน้า; chart ใช้ `maintainAspectRatio:false` |
-| **Security** | RLS ทุกตาราง, service role key server-only, AI key server-only, input validation (zod), SQL parameterized (Supabase client) |
-| **Accessibility** | semantic HTML, aria-label, keyboard focus, สี status มี label คู่กัน |
-| **i18n** | ไทยเป็นหลัก + label อังกฤษ (parity) |
-| **Resilience** | toast ทุก action, confirm modal ก่อน delete, validation ทุกฟอร์ม |
-| **Deployment** | Vercel (preview deploy ทุก PR), env แยก dev/prod |
-| **Data** | Health/Status cache + recompute trigger; soft consideration: audit log การแก้ thresholds |
+| ด้าน               | ข้อกำหนด                                                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Performance**   | หน้า Dashboard/Watchlist load < 2s สำหรับ 500 assets; pagination 20/หน้า; chart ใช้ `maintainAspectRatio:false`                |
+| **Security**      | RLS ทุกตาราง, service role key server-only, AI key server-only, input validation (zod), SQL parameterized (Supabase client) |
+| **Accessibility** | semantic HTML, aria-label, keyboard focus, สี status มี label คู่กัน                                                            |
+| **i18n**          | ไทยเป็นหลัก + label อังกฤษ (parity)                                                                                           |
+| **Resilience**    | toast ทุก action, confirm modal ก่อน delete, validation ทุกฟอร์ม                                                               |
+| **Deployment**    | Vercel (preview deploy ทุก PR), env แยก dev/prod                                                                            |
+| **Data**          | Health/Status cache + recompute trigger; soft consideration: audit log การแก้ thresholds                                    |
 
 ---
 
 ## 11. Definition of Done (per module)
+
 1. Route + RBAC guard ครบตามบทบาท
 2. parity ฟีเจอร์ + สูตรคำนวณกับต้นแบบ
 3. ดึง/เขียน Supabase ผ่าน RLS (ไม่ใช่ mock)
@@ -620,6 +670,7 @@ type DiagnoseResult = {
 > คัดลอกแต่ละบล็อกด้านล่างเป็น user prompt รอบถัดไป หลังจากวาง PRD นี้เป็น context แล้ว
 
 ### 🔵 STACK 2 — Phase P0 (Foundation + Core CM)
+
 ```
 Implement Phase P0 ของ UGT Reliability Lube Monitoring ตาม PRD:
 1) Setup Next.js 14 App Router + TypeScript + Tailwind + @supabase/ssr; สร้าง design-system components (Sidebar/Topbar/Card/KpiGrid/Badge/Pills/Button/DataTable/Modal/Toast) parity ต้นแบบ
@@ -631,7 +682,9 @@ Implement Phase P0 ของ UGT Reliability Lube Monitoring ตาม PRD:
 ```
 
 ### 🟡 STACK 2 — Phase P1 (PM Operations)
+
 > ประวัติ — โมดูลของ phase นี้ถอดออกแล้ว (2026-10-28) ยกเว้นส่วนที่เกี่ยวกับโมดูล 1–8
+
 ```
 Implement Phase P1 ต่อจาก P0 ตาม PRD — schema ส่วน 5.6–5.8 (pm_tasks, work_orders, alerts) + seed generator logic parity (genPMTasks/genWorkOrders/genAlerts):
 - PM Compliance Hub (KPI + trend + overdue table + AI/rule summary)
@@ -644,7 +697,9 @@ Implement Phase P1 ต่อจาก P0 ตาม PRD — schema ส่วน 5
 ```
 
 ### 🟣 STACK 2 — Phase P2 (Executive + AI)
+
 > ประวัติ — EAM, AI Reliability, Budget ถอดออกแล้ว (2026-10-28); Reports full PDF และ AI Diagnostic ยังอยู่
+
 ```
 Implement Phase P2 ต่อจาก P1 ตาม PRD — schema ส่วน 5.10 (budget) + AI provider abstraction:
 - AI integration: /api/ai/diagnose (multi-provider GLM/OpenAI/Anthropic via env, key server-only), ใช้ใน Drill-down>Intelligence, PM Hub, EAM
@@ -658,6 +713,7 @@ Implement Phase P2 ต่อจาก P1 ตาม PRD — schema ส่วน 5
 ---
 
 ## 13. หมายเหตุ parity สำคัญ (ห้ามพลาด)
+
 - **Single scoring formula** — `healthPenalty` + oil/vib weighting เดียวกันทุกหน้า
 - Health ทุกที่ (Dashboard KPI, Watchlist bar, Drill-down, Alarm Audit, AI Reliability ranking) ต้องตรงกัน
 - การ Save alarm/threshold → recompute health ทุก asset (parity ปุ่ม "บันทึก")

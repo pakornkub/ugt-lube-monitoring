@@ -1,14 +1,6 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/env";
+import { redirect } from 'next/navigation';
 
-export const dynamic = "force-dynamic";
-
-export default async function Home() {
-  if (isDemoMode()) redirect("/dashboard");
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  redirect(user ? "/dashboard" : "/login");
+// The (app) layout sends a visitor without a session to /login.
+export default function Home() {
+  redirect('/dashboard');
 }

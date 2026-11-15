@@ -1,4 +1,4 @@
-import { ToolbarSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
+import { ToolbarSkeleton, TableSkeleton } from '@/components/ui/LoadingSkeletons';
 
 export default function Loading() {
   return (

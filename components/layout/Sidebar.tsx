@@ -1,25 +1,24 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { BiLabel } from "@/components/ui/primitives";
-import { sectionsFor, type NavItem } from "@/lib/nav";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { LogoutButton } from "@/components/layout/LogoutButton";
-import type { Profile, Role } from "@/lib/types";
+import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { BiLabel } from '@/components/ui/primitives';
+import { sectionsFor, type NavItem } from '@/lib/nav';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
+import { LogoutButton } from '@/components/layout/LogoutButton';
+import type { Profile, Role } from '@/lib/types';
 
-const STORAGE_KEY = "sidebar-collapsed";
+const STORAGE_KEY = 'sidebar-collapsed';
 
 function isActive(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(href + "/");
+  return pathname === href || pathname.startsWith(href + '/');
 }
 
 export function Sidebar({
-  demo = false,
   viewAsRoles,
   menuMain,
   profile,
@@ -27,8 +26,7 @@ export function Sidebar({
   criticalCount = 0,
   warningCount = 0,
 }: {
-  demo?: boolean;
-  /** Admins only (lib/auth.ts "view as"): roles the user can preview the app as. */
+  /** Admins only (lib/profile.ts "view as"): roles the user can preview the app as. */
   viewAsRoles?: Role[];
   /** The role's "งานของฉัน" links (roles.menu_main); null = the original sidebar. */
   menuMain?: string[] | null;
@@ -47,11 +45,16 @@ export function Sidebar({
   // Start from the defaults so server and client render the same markup, then
   // apply what this browser remembered.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(SECTIONS.filter((s) => s.collapsible).map((s) => [s.id, !!s.defaultCollapsed])),
+    Object.fromEntries(
+      SECTIONS.filter((s) => s.collapsible).map((s) => [s.id, !!s.defaultCollapsed])
+    )
   );
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Record<string, boolean>;
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<
+        string,
+        boolean
+      >;
       setCollapsed((c) => ({ ...c, ...saved }));
     } catch {
       /* storage unavailable — keep defaults */
@@ -71,108 +74,143 @@ export function Sidebar({
   }
 
   return (
-    <aside className="on-dark z-[100] bg-[linear-gradient(180deg,rgba(245,158,11,0.07),transparent_45%)] flex w-[184px] max-[760px]:w-[56px] flex-shrink-0 flex-col overflow-y-auto overflow-x-hidden border-r border-white/10 bg-nav text-white transition-all duration-200">
+    <aside className="on-dark z-100 flex w-[184px] shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r border-white/10 bg-nav bg-[linear-gradient(180deg,rgba(245,158,11,0.07),transparent_45%)] text-white transition-all duration-200 max-[760px]:w-[56px]">
       <div className="oil-sheen border-b border-white/10 px-2.5 py-3 max-[760px]:px-2 max-[760px]:py-2">
         <div className="flex items-center gap-1.5 max-[760px]:justify-center">
-          <div className="flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center rounded-[7px] max-[760px]:h-[30px] max-[760px]:w-[30px]">
-            <Image src="/logo.svg" alt="UBE logo" width={40} height={40} unoptimized className="h-full w-full object-contain" priority />
+          <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[7px] max-[760px]:h-[30px] max-[760px]:w-[30px]">
+            <Image
+              src="/logo.svg"
+              alt="UBE logo"
+              width={40}
+              height={40}
+              unoptimized
+              className="h-full w-full object-contain"
+              priority
+            />
           </div>
           <div className="whitespace-nowrap max-[760px]:hidden">
-            <div className="text-[12px] font-bold leading-tight tracking-wide">UGT RELIABILITY</div>
-            <div className="text-[12px] font-bold uppercase leading-tight tracking-[0.04em] text-yellow">Lube Monitoring</div>
+            <div className="text-[12px] leading-tight font-bold tracking-wide">UGT RELIABILITY</div>
+            <div className="text-[12px] leading-tight font-bold tracking-[0.04em] text-yellow uppercase">
+              Lube Monitoring
+            </div>
           </div>
         </div>
       </div>
 
       <nav aria-label="เมนูหลัก (Main navigation)" className="flex flex-1 flex-col">
-      {SECTIONS.map((section) => {
-        const items = section.items.filter((item) => !item.perm || granted.has(item.perm));
-        if (items.length === 0) return null;
-        // A section holding the current page never hides it.
-        const hasActive = items.some((i) => isActive(pathname, i.href));
-        const isCollapsed = collapsed[section.id] ?? !!section.defaultCollapsed;
-        const folded = !!section.collapsible && isCollapsed && !hasActive;
-        const listId = `nav-${section.id}`;
-        return (
-          <div key={section.id} className={cn("pb-1", section.pinBottom && "mt-auto border-t border-white/10")}>
-            {section.collapsible ? (
-              <button
-                type="button"
-                onClick={() => toggle(section.id, isCollapsed)}
-                aria-expanded={!folded}
-                aria-controls={listId}
-                className="flex w-full items-center justify-between px-3 pb-1 pt-2.5 text-left text-[13px] font-bold text-white/55 transition hover:text-white/85 max-[760px]:hidden"
-              >
-                <span className="flex items-start gap-1.5">
-                  {section.icon && <section.icon className="mt-[3px] h-3.5 w-3.5 shrink-0" aria-hidden />}
-                  <BiLabel text={section.title} />
-                </span>
-                <ChevronDown className={cn("h-3.5 w-3.5 transition", folded && "-rotate-90")} aria-hidden />
-              </button>
-            ) : (
-              <div className="px-3 pb-1 pt-2.5 text-[13px] font-bold text-white/55 max-[760px]:hidden">
-                <span><BiLabel text={section.title} /></span>
+        {SECTIONS.map((section) => {
+          const items = section.items.filter((item) => !item.perm || granted.has(item.perm));
+          if (items.length === 0) return null;
+          // A section holding the current page never hides it.
+          const hasActive = items.some((i) => isActive(pathname, i.href));
+          const isCollapsed = collapsed[section.id] ?? !!section.defaultCollapsed;
+          const folded = !!section.collapsible && isCollapsed && !hasActive;
+          const listId = `nav-${section.id}`;
+          return (
+            <div
+              key={section.id}
+              className={cn('pb-1', section.pinBottom && 'mt-auto border-t border-white/10')}
+            >
+              {section.collapsible ? (
+                <button
+                  type="button"
+                  onClick={() => toggle(section.id, isCollapsed)}
+                  aria-expanded={!folded}
+                  aria-controls={listId}
+                  className="flex w-full items-center justify-between px-3 pt-2.5 pb-1 text-left text-[13px] font-bold text-white/55 transition hover:text-white/85 max-[760px]:hidden"
+                >
+                  <span className="flex items-start gap-1.5">
+                    {section.icon && (
+                      <section.icon className="mt-[3px] h-3.5 w-3.5 shrink-0" aria-hidden />
+                    )}
+                    <BiLabel text={section.title} />
+                  </span>
+                  <ChevronDown
+                    className={cn('h-3.5 w-3.5 transition', folded && '-rotate-90')}
+                    aria-hidden
+                  />
+                </button>
+              ) : (
+                <div className="px-3 pt-2.5 pb-1 text-[13px] font-bold text-white/55 max-[760px]:hidden">
+                  <span>
+                    <BiLabel text={section.title} />
+                  </span>
+                </div>
+              )}
+              {/* In the icon-only rail there are no section headers to unfold with, so show everything. */}
+              <div id={listId} className={cn(folded && 'hidden max-[760px]:block')}>
+                {items.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    active={isActive(pathname, item.href)}
+                    badge={item.href === '/dashboard' ? criticalCount || warningCount : 0}
+                    warn={criticalCount === 0}
+                  />
+                ))}
               </div>
-            )}
-            {/* In the icon-only rail there are no section headers to unfold with, so show everything. */}
-            <div id={listId} className={cn(folded && "hidden max-[760px]:block")}>
-              {items.map((item) => (
-                <NavLink
-                  key={item.href}
-                  item={item}
-                  active={isActive(pathname, item.href)}
-                  badge={item.href === "/dashboard" ? criticalCount || warningCount : 0}
-                  warn={criticalCount === 0}
-                />
-              ))}
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
       </nav>
 
-      {/* Connection status only once a real database is attached. */}
-      {!demo && (
+      {/* Connection status. */}
+      {
         <div className="border-t border-white/10 px-3 py-2 max-[760px]:px-1">
-          <div className="flex items-center gap-1.5 max-[760px]:justify-center" role="status" aria-label="System status: Connected">
-            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-green" />
-            <div className="text-[14px] font-semibold text-green max-[760px]:hidden">เชื่อมต่อสำเร็จ (Connected)</div>
+          <div
+            className="flex items-center gap-1.5 max-[760px]:justify-center"
+            role="status"
+            aria-label="System status: Connected"
+          >
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green" />
+            <div className="text-[14px] font-semibold text-green max-[760px]:hidden">
+              เชื่อมต่อสำเร็จ (Connected)
+            </div>
           </div>
         </div>
-      )}
+      }
 
       {/* User card. data-theme="dark": the buttons' tokens must read on the black sidebar in light mode too. */}
-      <div data-theme="dark" className="border-t border-white/10 px-2.5 py-2.5 text-t1 max-[760px]:px-1">
+      <div
+        data-theme="dark"
+        className="border-t border-white/10 px-2.5 py-2.5 text-t1 max-[760px]:px-1"
+      >
         <div className="flex items-center gap-2 max-[760px]:justify-center">
           <div
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-cyan text-[13px] font-bold uppercase text-white"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan text-[13px] font-bold text-white uppercase"
             title={`${profile.full_name ?? profile.role} · ${profile.role}`}
           >
             {(profile.full_name || profile.role).slice(0, 2)}
           </div>
           <div className="min-w-0 max-[760px]:hidden">
-            <div className="truncate text-[14px] font-semibold">{profile.full_name || "—"}</div>
+            <div className="truncate text-[14px] font-semibold">{profile.full_name || '—'}</div>
             <div className="truncate text-[12px] text-t3">
-              {profile.role} · {profile.site_access.length ? profile.site_access.join(", ") : "All Plants"}
+              {profile.role} ·{' '}
+              {profile.site_access.length ? profile.site_access.join(', ') : 'All Plants'}
             </div>
           </div>
         </div>
         {viewAsRoles && viewAsRoles.length > 0 && (
           <label className="mt-2 block max-[760px]:hidden">
-            <span className="text-[12px] text-t3">ดูในมุมมอง role{demo ? " (Demo)" : ""}</span>
+            <span className="text-[12px] text-t3">ดูในมุมมอง role</span>
             <select
               value={profile.role}
               onChange={(e) => {
-                // Checked on the server (lib/auth.ts "view as"); picking your own role ends the preview.
+                // Checked on the server (lib/profile.ts "view as"); picking your own role ends the preview.
                 const own = e.target.value === (profile.real_role ?? profile.role);
                 document.cookie = own
-                  ? "view-as=; path=/; max-age=0; samesite=lax"
+                  ? 'view-as=; path=/; max-age=0; samesite=lax'
                   : `view-as=${e.target.value}; path=/; max-age=86400; samesite=lax`;
                 router.refresh();
               }}
-              className="mt-0.5 w-full rounded-md border border-border bg-bg2 px-1.5 py-1 text-[13px] text-t1 outline-none focus:border-cyan"
+              className="mt-0.5 w-full rounded-md border border-border bg-bg2 px-1.5 py-1 text-[13px] text-t1 outline-hidden focus:border-cyan"
             >
-              {viewAsRoles.map((r) => <option key={r.id} value={r.id}>{r.label}{r.id === (profile.real_role ?? profile.role) ? " · ของฉัน" : ""}</option>)}
+              {viewAsRoles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                  {r.id === (profile.real_role ?? profile.role) ? ' · ของฉัน' : ''}
+                </option>
+              ))}
             </select>
           </label>
         )}
@@ -185,23 +223,38 @@ export function Sidebar({
   );
 }
 
-function NavLink({ item, active, badge = 0, warn = false }: { item: NavItem; active: boolean; badge?: number; warn?: boolean }) {
+function NavLink({
+  item,
+  active,
+  badge = 0,
+  warn = false,
+}: {
+  item: NavItem;
+  active: boolean;
+  badge?: number;
+  warn?: boolean;
+}) {
   const Icon = item.icon;
   const inner = (
     <>
       {/* The count sits on the icon's corner, so it never takes width from the label. */}
-      <span className="relative flex-shrink-0">
+      <span className="relative shrink-0">
         <Icon
           className={cn(
-            "h-4 w-4 transition max-[760px]:h-[18px] max-[760px]:w-[18px]",
-            active ? "text-cyan-dark" : "group-hover:text-cyan-dark",
+            'h-4 w-4 transition max-[760px]:h-[18px] max-[760px]:w-[18px]',
+            active ? 'text-cyan-dark' : 'group-hover:text-cyan-dark'
           )}
           aria-hidden
         />
         {badge > 0 && (
           // #dc2626: white text 4.8:1 (brand red #ef4444 was 3.8:1); amber #f59e0b takes black text
-          <span className={cn("absolute -right-2 -top-2 min-w-[16px] rounded-full px-1 text-center text-[10px] font-bold leading-4 ring-2 ring-nav", warn ? "bg-[#f59e0b] text-black" : "bg-[#dc2626] text-white")}>
-            {badge > 99 ? "99+" : badge}
+          <span
+            className={cn(
+              'absolute -top-2 -right-2 min-w-[16px] rounded-full px-1 text-center text-[10px] leading-4 font-bold ring-2 ring-nav',
+              warn ? 'bg-[#f59e0b] text-black' : 'bg-[#dc2626] text-white'
+            )}
+          >
+            {badge > 99 ? '99+' : badge}
           </span>
         )}
       </span>
@@ -209,10 +262,15 @@ function NavLink({ item, active, badge = 0, warn = false }: { item: NavItem; act
     </>
   );
   const base =
-    "relative m-[1px] mx-[6px] flex items-center gap-2 rounded-lg px-2 py-[7px] text-[14px] font-medium max-[760px]:mx-auto max-[760px]:w-[40px] max-[760px]:justify-center max-[760px]:p-2";
+    'relative m-px mx-[6px] flex items-center gap-2 rounded-lg px-2 py-[7px] text-[14px] font-medium max-[760px]:mx-auto max-[760px]:w-[40px] max-[760px]:justify-center max-[760px]:p-2';
   if (!item.enabled) {
     return (
-      <div aria-label={item.label} aria-disabled="true" title={`${item.label} · ${item.sub}`} className={cn(base, "cursor-not-allowed text-white/25")}>
+      <div
+        aria-label={item.label}
+        aria-disabled="true"
+        title={`${item.label} · ${item.sub}`}
+        className={cn(base, 'cursor-not-allowed text-white/25')}
+      >
         {inner}
       </div>
     );
@@ -220,16 +278,18 @@ function NavLink({ item, active, badge = 0, warn = false }: { item: NavItem; act
   return (
     <Link
       href={item.href}
-      aria-label={badge > 0 ? `${item.label} (${warn ? "เฝ้าระวัง" : "วิกฤต"} ${badge} เครื่อง)` : item.label}
-      aria-current={active ? "page" : undefined}
+      aria-label={
+        badge > 0 ? `${item.label} (${warn ? 'เฝ้าระวัง' : 'วิกฤต'} ${badge} เครื่อง)` : item.label
+      }
+      aria-current={active ? 'page' : undefined}
       title={`${item.label} · ${item.sub}`}
       className={cn(
         base,
-        "group transition",
+        'group transition',
         // Selected: white text on a soft fill with a bar on the left edge.
         active
-          ? "bg-white/[0.09] text-white before:absolute before:inset-y-1.5 before:left-[-6px] before:w-[3px] before:rounded-r-full before:bg-cyan-dark max-[760px]:before:left-[-8px]"
-          : "text-white/75 hover:bg-white/[0.05] hover:text-white",
+          ? 'bg-white/9 text-white before:absolute before:inset-y-1.5 before:left-[-6px] before:w-[3px] before:rounded-r-full before:bg-cyan-dark max-[760px]:before:left-[-8px]'
+          : 'text-white/75 hover:bg-white/5 hover:text-white'
       )}
     >
       {inner}

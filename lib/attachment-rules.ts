@@ -7,22 +7,30 @@
 // have matched a file the bucket would actually have accepted.
 export const MAX_LAB_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const LAB_ATTACHMENT_MIME_TYPES = new Set([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-excel",
-  "text/csv",
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'text/csv',
 ]);
-export const LAB_ATTACHMENT_EXTENSIONS = new Set([".pdf", ".xlsx", ".xls", ".csv"]);
+export const LAB_ATTACHMENT_EXTENSIONS = new Set(['.pdf', '.xlsx', '.xls', '.csv']);
 export const MAX_DOC_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 export const DOC_ATTACHMENT_MIME_TYPES = new Set([
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "image/png",
-  "image/jpeg",
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/png',
+  'image/jpeg',
 ]);
-export const DOC_ATTACHMENT_EXTENSIONS = new Set([".pdf", ".doc", ".docx", ".xlsx", ".png", ".jpg", ".jpeg"]);
+export const DOC_ATTACHMENT_EXTENSIONS = new Set([
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xlsx',
+  '.png',
+  '.jpg',
+  '.jpeg',
+]);
 
 // Real enforcement is the storage-bucket file_size_limit/allowed_mime_types
 // set in supabase/0022_attachment_bucket_limits.sql — this is defense in
@@ -37,12 +45,12 @@ export function validateAttachment(
   sizeBytes: number | null,
   maxBytes: number,
   allowedTypes: Set<string>,
-  allowedExtensions: Set<string>,
+  allowedExtensions: Set<string>
 ): string | null {
-  if (sizeBytes == null) return "ไม่ทราบขนาดไฟล์";
+  if (sizeBytes == null) return 'ไม่ทราบขนาดไฟล์';
   if (sizeBytes > maxBytes) return `ไฟล์ใหญ่เกิน ${Math.round(maxBytes / (1024 * 1024))}MB`;
-  const ext = fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
+  const ext = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
   const typeOk = mimeType ? allowedTypes.has(mimeType) : allowedExtensions.has(ext);
-  if (!typeOk) return "ชนิดไฟล์ไม่ได้รับอนุญาต";
+  if (!typeOk) return 'ชนิดไฟล์ไม่ได้รับอนุญาต';
   return null;
 }

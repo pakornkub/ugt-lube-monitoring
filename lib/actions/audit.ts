@@ -1,28 +1,50 @@
-"use server";
+'use server';
 
-import { getLatestReadings } from "@/lib/queries/readings";
-import { getAsset } from "@/lib/queries/assets";
-import { getAssetAlarmConfig } from "@/lib/queries/alarms";
-import { BLANK_OIL, BLANK_VIB } from "@/lib/local-store";
-import { getDeductionBreakdown, readingLevel, type DeductionBreakdown, type ReadingLevel } from "@/lib/scoring/audit";
-import type { AlarmParam, OilReading, ScoreConfig, VibReading } from "@/lib/types";
+import { getLatestReadings } from '@/lib/queries/readings';
+import { getAsset } from '@/lib/queries/assets';
+import { getAssetAlarmConfig } from '@/lib/queries/alarms';
+import {
+  getDeductionBreakdown,
+  readingLevel,
+  type DeductionBreakdown,
+  type ReadingLevel,
+} from '@/lib/scoring/audit';
+import type { AlarmParam, OilReading, ScoreConfig, VibReading } from '@/lib/types';
 
 // Live audit preview: computes the deduction breakdown for an asset using the
 // CURRENT (possibly unsaved) threshold values passed from the form. Runs the
-// SAME penalty math as the DB compute_health (display only).
+// SAME penalty math as the stored Health Score (lib/scoring/recompute.ts; display only).
 export async function getAssetAudit(input: {
   assetId: string;
   params: AlarmParam[];
   scoreConfig: ScoreConfig;
 }): Promise<DeductionBreakdown> {
   try {
-    const [{ oil, vib }, asset] = await Promise.all([getLatestReadings(input.assetId), getAsset(input.assetId)]);
+    const [{ oil, vib }, asset] = await Promise.all([
+      getLatestReadings(input.assetId),
+      getAsset(input.assetId),
+    ]);
     return getDeductionBreakdown(oil, vib, input.params, input.scoreConfig, asset?.vg_grade);
   } catch (e) {
-    console.error("[getAssetAudit]", e);
+    console.error('[getAssetAudit]', e);
     return getDeductionBreakdown(null, null, input.params, input.scoreConfig);
   }
 }
+
+const BLANK_OIL: OilReading = {
+  period: '',
+  fe: null,
+  cu: null,
+  si: null,
+  water: null,
+  visc: null,
+  tan: null,
+  iso_code: null,
+  particle_4: null,
+  particle_6: null,
+  particle_14: null,
+};
+const BLANK_VIB: VibReading = { period: '', vel: null, acc: null, cf: null, temp: null };
 
 export interface ReadingPreview {
   current: DeductionBreakdown;
@@ -32,12 +54,11 @@ export interface ReadingPreview {
   olderThanLatest: boolean;
 }
 
-
 // What the asset's Health Score would become if this (unsaved) reading were
 // saved — same formula and the asset's own effective config, display only.
 export async function previewReading(input: {
   assetId: string;
-  kind: "oil" | "vib";
+  kind: 'oil' | 'vib';
   period: string;
   values: Record<string, number>;
 }): Promise<ReadingPreview | null> {
@@ -49,12 +70,24 @@ export async function previewReading(input: {
     ]);
     if (!asset) return null;
     const vg = asset.vg_grade;
-    const current = getDeductionBreakdown(latest.oil, latest.vib, alarm.params, alarm.scoreConfig, vg);
+    const current = getDeductionBreakdown(
+      latest.oil,
+      latest.vib,
+      alarm.params,
+      alarm.scoreConfig,
+      vg
+    );
 
-    const existing = input.kind === "oil" ? latest.oil : latest.vib;
+    const existing = input.kind === 'oil' ? latest.oil : latest.vib;
     const olderThanLatest = !!existing && existing.period > input.period;
-    const oil = input.kind === "oil" && !olderThanLatest ? { ...BLANK_OIL, period: input.period, ...input.values } : latest.oil;
-    const vib = input.kind === "vib" && !olderThanLatest ? { ...BLANK_VIB, period: input.period, ...input.values } : latest.vib;
+    const oil =
+      input.kind === 'oil' && !olderThanLatest
+        ? { ...BLANK_OIL, period: input.period, ...input.values }
+        : latest.oil;
+    const vib =
+      input.kind === 'vib' && !olderThanLatest
+        ? { ...BLANK_VIB, period: input.period, ...input.values }
+        : latest.vib;
     const preview = getDeductionBreakdown(oil, vib, alarm.params, alarm.scoreConfig, vg);
 
     const levels: Record<string, ReadingLevel> = {};
@@ -64,7 +97,7 @@ export async function previewReading(input: {
     }
     return { current, preview, levels, olderThanLatest };
   } catch (e) {
-    console.error("[previewReading]", e);
+    console.error('[previewReading]', e);
     return null;
   }
 }

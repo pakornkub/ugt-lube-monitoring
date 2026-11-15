@@ -1,4 +1,4 @@
-import { ToolbarSkeleton, CardGridSkeleton } from "@/components/ui/Skeleton";
+import { ToolbarSkeleton, CardGridSkeleton } from '@/components/ui/LoadingSkeletons';
 
 export default function Loading() {
   return (
