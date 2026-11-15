@@ -127,7 +127,7 @@ export function proxy(request: NextRequest) {
     pathname === '/favicon.ico' ||
     pathname.startsWith('/api/auth/') ||
     pathname.startsWith('/api/health') || // Health check — must bypass auth for monitoring tools
-    pathname.startsWith('/api/cron/') || // Host-cron jobs — each route checks CRON_SECRET itself (cicd references/scheduled-jobs.md)
+    pathname.startsWith('/api/cron/') || // Cron-service jobs — each route checks CRON_SECRET itself (cicd references/scheduled-jobs.md)
     /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|eot|otf|css|js|map)$/i.test(pathname)
   ) {
     return applySecurityHeaders(NextResponse.next(), request, nonce);

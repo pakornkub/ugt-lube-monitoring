@@ -7,7 +7,7 @@ export const env = createEnv({
   server: {
     // ── 1. App + runtime
     APP_PORT: z.string().optional(),
-    // Host cron → /api/cron/<job> sends it as a Bearer token.
+    // The compose cron service (jobs.crontab) → /api/cron/<job> sends it as a Bearer token.
     CRON_SECRET: z.string().optional(),
 
     // ── 2. Database

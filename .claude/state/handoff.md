@@ -15,9 +15,11 @@ Last updated: 2026-11-16
 
 ## Next (all wait on the admin team)
 
-- (sent to the admin team 2026-11-16) Admin team returns the values in `docs/admin-handoff.md` → put them in `.env.local` → full system test on the
-  real dev DB + Keycloak + SMTP (`/ugt-nextjs-system-test` live mode once that skill ships). Never tested here:
-  real SSO login, SMTP delivery, Jenkins/Docker deploy
+- (sent to the admin team 2026-11-16; **revised the same day** — one owner login, no shadow DB, two Jenkins
+  jobs, no host cron: re-send the new version) Admin team returns the values in `docs/admin-handoff.md` → put
+  them in `.env.local` → full system test on the real dev DB + Keycloak + SMTP (`/ugt-nextjs-system-test` live
+  mode once that skill ships). Never tested here: real SSO login, SMTP delivery, Jenkins/Docker deploy, the
+  `cron` service (supercronic) image build
 - Jenkins/SonarQube job ready → push `develop` → 10 stages green → merge PR #1
 
 ## Open Questions
@@ -26,6 +28,8 @@ Last updated: 2026-11-16
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
 
+- 2026-11-16 Org infra rules (ADR 0007): no shadow DB, owner login for prod+dev, two Jenkins Pipeline jobs,
+  scheduled jobs in the compose `cron` service (`jobs.crontab`), nginx described in words
 - 2026-11-16 Owner decisions: weekly digest stays Monday 13:00 Bangkok; lab period labels keep the Buddhist year (DESIGN.md §10)
 - 2026-11-15 Smoke test on SQL Server LocalDB + fixes: sidebar logo and sort link under basePath, "Last update" moves
   forward with new readings, batched recompute-all (6.4 s → 0.4 s), audit RecordId length, import keeps install date,

@@ -45,7 +45,7 @@ Pre-commit (husky + lint-staged) formats and lints staged files.
 Push `develop` (dev, `/ugt-lube-monitoring-dev`) or `main` (prod, `/ugt-lube-monitoring`) — Jenkins runs
 lint/format/typecheck → tests → build → OWASP → SonarQube Quality Gate → Docker build → migrate → deploy
 (`Jenkinsfile`, `Dockerfile`, `docker-compose*.yml`). Attachments live on the bind mount
-`/home/docker02/appdata/<project>/storage`. Scheduled jobs (weekly digest, attachment sweep) run from host cron.
+`/home/docker02/appdata/<project>/storage`. Scheduled jobs (weekly digest, attachment sweep) run in the `cron` service of `docker-compose.yml` (`jobs.crontab`).
 
 ## Health Score — read before touching scoring code
 

@@ -56,13 +56,12 @@ Branch-dependent values **must** be resolved inside `script {}` from
 `env.BRANCH_NAME ?: env.GIT_BRANCH?.tokenize('/')?.last()` — never in the
 global `environment {}` block (global = one value for every branch).
 
-## Scheduled jobs — host cron, or a cron service in the prod compose (org decision 2026-10-09)
+## Scheduled jobs — a cron service in the prod compose, never the host crontab (org decision 2026-11-16)
 
-- Every scheduled/recurring job = one **host cron** line in the admin handoff
-  cron table → `docker exec <container> node -e "fetch(…)"` the app's `/api/cron/<job>` route (secret read inside the container, never in argv)
-  (`references/scheduled-jobs.md`) — **or** a `cron` service in `docker-compose.yml` only
-  (supercronic + repo `jobs.crontab`, `TZ: Asia/Bangkok`, `tzdata` + `supercronic -test` in the
-  Dockerfile; never in `docker-compose.dev.yml`). **No in-app scheduler**: no `node-cron`,
+- Every scheduled/recurring job = one line in the repo `jobs.crontab`, run by the `cron` service in
+  `docker-compose.yml` only (supercronic, same image, `TZ: Asia/Bangkok`, `tzdata` + `supercronic -test`
+  in the Dockerfile) → `node -e "fetch(…)"` the app's `/api/cron/<job>` route over `proxy-network` — deployed
+  with the app; never in `docker-compose.dev.yml`, never a host crontab. **No in-app scheduler**: no `node-cron`,
   `node-schedule`, `setInterval` loops, no SQL Agent job, no Jenkins timer
 - `/api/cron/*` routes: `POST` only · `Authorization: Bearer ${CRON_SECRET}`
   checked first (401 otherwise) · idempotent · destructive jobs keep the

@@ -7,8 +7,8 @@ import { getNotificationConfig } from '@/lib/queries/notifications';
 
 export const dynamic = 'force-dynamic';
 
-// Host cron: POST /api/cron/weekly-digest with `Authorization: Bearer $CRON_SECRET`,
-// every Monday (docs/admin-handoff.md cron table). No user session, so it reads the
+// Cron service (jobs.crontab): POST /api/cron/weekly-digest with `Authorization: Bearer $CRON_SECRET`,
+// every Monday 13:00. No user session, so it reads the
 // whole fleet, like a global admin view.
 function authorized(request: Request): boolean {
   if (!env.CRON_SECRET) return false;
