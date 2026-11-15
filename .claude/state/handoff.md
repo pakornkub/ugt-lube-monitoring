@@ -15,7 +15,7 @@ Last updated: 2026-11-16
 
 ## Next (all wait on the admin team)
 
-- Admin team returns the values in `docs/admin-handoff.md` → put them in `.env.local` → full system test on the
+- (sent to the admin team 2026-11-16) Admin team returns the values in `docs/admin-handoff.md` → put them in `.env.local` → full system test on the
   real dev DB + Keycloak + SMTP (`/ugt-nextjs-system-test` live mode once that skill ships). Never tested here:
   real SSO login, SMTP delivery, Jenkins/Docker deploy
 - Jenkins/SonarQube job ready → push `develop` → 10 stages green → merge PR #1
