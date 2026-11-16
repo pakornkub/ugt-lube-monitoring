@@ -37,7 +37,7 @@ Vitest · Jenkins + Docker + SonarQube. basePath prod `/ugt-lube-monitoring`, de
   แจ้งแอดมินเมื่อยังไม่มี role) → `app/(app)/layout.tsx`
 - ไฟล์แนบ: `lib/upload-client.ts` → `POST /api/files` → volume + `ReadingAttachments`/`StandardAttachments` ·
   ดาวน์โหลด `GET /api/files/<target>/<id>` (guard + 404)
-- Weekly digest: compose `cron` service (`jobs.crontab`, prod only) → `POST /api/cron/weekly-digest` (Bearer `CRON_SECRET`) → `lib/email/weekly-digest-build.ts` → SMTP · ทุกวันจันทร์ 13:00 เวลาไทย (เจ้าของโปรเจคยืนยัน 2026-11-16)
+- Weekly digest: compose `cron` service (busybox crond, prod only) → `POST /api/cron/weekly-digest` (Bearer `CRON_SECRET`) → `lib/email/weekly-digest-build.ts` → SMTP · ทุกวันจันทร์ 13:00 เวลาไทย (เจ้าของโปรเจคยืนยัน 2026-11-16)
 
 ## ตารางหลัก → feature
 

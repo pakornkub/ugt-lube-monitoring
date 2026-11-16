@@ -65,18 +65,6 @@ ENV NODE_ENV=production \
 RUN addgroup -g 1001 -S nodejs && \
     adduser  -u 1001 -S nextjs -G nodejs
 
-# [CRON] scheduled jobs run in the compose `cron` service (same image) — supercronic + jobs.crontab.
-# Pinned + SHA1 from the supercronic-linux-amd64 release notes; tzdata so TZ=Asia/Bangkok applies.
-ARG SUPERCRONIC_VERSION=v0.2.49
-ARG SUPERCRONIC_SHA1SUM=e63c11a9726b775a6a11801e81af4f3fb926aa68
-RUN apk add --no-cache tzdata \
- && wget -qO /usr/local/bin/supercronic "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-amd64" \
- && echo "${SUPERCRONIC_SHA1SUM}  /usr/local/bin/supercronic" | sha1sum -c - \
- && chmod +x /usr/local/bin/supercronic
-COPY --chown=nextjs:nodejs jobs.crontab ./
-# a broken crontab fails the build — Jenkins polls only the app container, so it would deploy green
-RUN supercronic -test /app/jobs.crontab
-
 # Copy only what Next.js needs at runtime (standalone output)
 COPY --from=builder --chown=nextjs:nodejs /app/public           ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

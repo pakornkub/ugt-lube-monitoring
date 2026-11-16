@@ -12,8 +12,8 @@
 | GET | `/api/search` | ค้นหาเครื่องจักร (topbar) | `app/api/search/route.ts` | `components/layout/GlobalSearch.tsx` |
 | GET | `/api/compare` | เทียบเครื่องจักร | `app/api/compare/route.ts` | `components/drilldown/DrillDownClient.tsx` |
 | POST | `/api/ai/diagnose` · `/api/ai/rca` · `/api/ai/standard` | AI วินิจฉัย / RCA / ถามมาตรฐาน (+ fallback) | `app/api/ai/*/route.ts` | Drill-down, Standards |
-| POST | `/api/cron/weekly-digest` | ส่งสรุปรายสัปดาห์ (Bearer `CRON_SECRET`) | `app/api/cron/weekly-digest/route.ts` | cron service (`jobs.crontab`) |
-| POST | `/api/cron/attachments-sweep` | ลบไฟล์แนบที่ถูกลบเกิน 90 วัน | `app/api/cron/attachments-sweep/route.ts` | cron service (`jobs.crontab`) |
+| POST | `/api/cron/weekly-digest` | ส่งสรุปรายสัปดาห์ (Bearer `CRON_SECRET`) | `app/api/cron/weekly-digest/route.ts` | compose `cron` service |
+| POST | `/api/cron/attachments-sweep` | ลบไฟล์แนบที่ถูกลบเกิน 90 วัน | `app/api/cron/attachments-sweep/route.ts` | compose `cron` service |
 
 ## Server Actions (`lib/actions/`)
 

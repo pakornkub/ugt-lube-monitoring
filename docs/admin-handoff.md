@@ -73,6 +73,8 @@
 | Script Path | `Jenkinsfile` | `Jenkinsfile` |
 | Lightweight checkout | **ปิด** (เปิดไว้ stage แรกพัง) | **ปิด** |
 
+> สร้างเสร็จกด **Build Now** ให้แต่ละ job 1 ครั้ง — GitHub hook trigger เริ่มทำงานหลัง job รันครั้งแรกเท่านั้น
+
 ### E. GitHub — Webhook
 
 ที่: **repo → Settings → Webhooks → Add webhook**
@@ -153,5 +155,4 @@ Admin สร้าง reverse proxy ของโปรเจคตามรู�
 | Manage Jenkins → System → Global properties | env var | `NOTIFY_EMAIL` · `SMTP_FROM` |
 | SonarQube → Quality Gates → Create | เงื่อนไข (On New Code) | `new_violations` = 0 · `new_duplicated_lines_density` ≤ 3% · `new_coverage` ≥ 60% · `new_security_hotspots_reviewed` = 100% |
 | Docker host | สร้าง network | `docker network create proxy-network` |
-| Docker host | ออก internet ตอน build | `github.com` และ `release-assets.githubusercontent.com` (ดาวน์โหลดตัวรัน job ตั้งเวลาตอน build image) |
 | Docker host (Jenkins) | ให้ Jenkins สั่ง docker ได้ | Jenkins มี Docker CLI · user `jenkins` อยู่ใน group `docker` ที่ GID ตรงกับ host (`getent group docker`) |

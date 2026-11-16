@@ -35,7 +35,8 @@ services:
       # 1. runtime
       NODE_ENV: production
       NODE_TLS_REJECT_UNAUTHORIZED: '0' # org standard, always on: closed intranet + internal-CA Keycloak/LDAP
-      CRON_SECRET: ${CRON_SECRET} # [CRON] the cron service (jobs.crontab) → /api/cron/<job>
+      TZ: Asia/Bangkok # org standard, always on: without it every local-date calculation runs 7 hours off (UTC)
+      CRON_SECRET: ${CRON_SECRET} # [CRON] the cron service (docker-compose.yml) → /api/cron/<job>
       # 2. database
       DATABASE_URL: ${DATABASE_URL} # [DB]
       # 3. auth
@@ -87,21 +88,36 @@ services:
           cpus: '0.25'
           memory: 256M
 
-  # [CRON] scheduled jobs (jobs.crontab) — prod only, deployed together with the app.
+  # [CRON] scheduled jobs — prod only, deployed together with the app (references/scheduled-jobs.md).
   # Never in docker-compose.dev.yml (the job would run in both environments).
+  # Same shape as ugt-hrms: busybox crond in plain alpine, crontab written at start-up (a
+  # bind-mounted file would vanish with Jenkins' cleanWs). Deliberate details:
+  #  - ${CRON_SECRET} is filled in by compose, because busybox crond gives jobs a minimal env
+  #    of their own; keep crond at -l 8 — a chattier level logs each command, token included
+  #  - the app is called by its CONTAINER name: every org project's service is named `app` on
+  #    the shared proxy-network, so `http://app:3000` can land on another project's container
+  #  - TZ=ICT-7 is a POSIX zone string, so no tzdata download at every start
+  #  - one line per /api/cron/<job> route; output + FAILED go to `docker logs ugt-lube-monitoring-cron`
+  #  - weekly-digest Monday 13:00 (owner confirmed 2026-11-16) · attachments-sweep daily 02:00
   cron:
-    image: ugt-lube-monitoring:latest
-    pull_policy: never
+    image: alpine:3.20
     container_name: ugt-lube-monitoring-cron
     restart: unless-stopped
-    command: ['supercronic', '/app/jobs.crontab']
+    depends_on:
+      - app
     networks:
-      - proxy-network # reaches the app as http://ugt-lube-monitoring:3000
+      - proxy-network
     environment:
-      TZ: Asia/Bangkok
-      CRON_SECRET: ${CRON_SECRET}
-    healthcheck:
-      disable: true # the image HEALTHCHECK probes a web server this service does not run
+      TZ: ICT-7
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/crontabs/root <<'CRONTAB'
+        0 13 * * 1 wget -qO- -T 600 --post-data= --header="Authorization: Bearer ${CRON_SECRET}" http://ugt-lube-monitoring:3000/ugt-lube-monitoring/api/cron/weekly-digest >/proc/1/fd/1 2>&1 && echo " [cron] weekly-digest ok" >/proc/1/fd/1 || echo "[cron] weekly-digest FAILED" >/proc/1/fd/1
+        0 2 * * * wget -qO- -T 600 --post-data= --header="Authorization: Bearer ${CRON_SECRET}" http://ugt-lube-monitoring:3000/ugt-lube-monitoring/api/cron/attachments-sweep >/proc/1/fd/1 2>&1 && echo " [cron] attachments-sweep ok" >/proc/1/fd/1 || echo "[cron] attachments-sweep FAILED" >/proc/1/fd/1
+        CRONTAB
+        exec crond -f -l 8
     logging:
       driver: json-file
       options:
@@ -110,8 +126,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: 128M
+          cpus: '0.1'
+          memory: 64M
 
 networks:
   # Shared reverse-proxy network on the Docker host (created once, externally)

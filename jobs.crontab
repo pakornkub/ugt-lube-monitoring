@@ -1,9 +1,0 @@
-# Scheduled jobs — run by the `cron` service in docker-compose.yml (prod only), TZ=Asia/Bangkok.
-# Each line POSTs the app's /api/cron/<job> route over proxy-network; CRON_SECRET is read from the
-# service env inside node, never on the command line. Output → `docker logs ugt-lube-monitoring-cron`.
-
-# weekly-digest — every Monday 13:00 (owner confirmed 2026-11-16)
-0 13 * * 1 node -e "fetch('http://ugt-lube-monitoring:3000/ugt-lube-monitoring/api/cron/weekly-digest',{method:'POST',headers:{authorization:'Bearer '+process.env.CRON_SECRET},signal:AbortSignal.timeout(600000)}).then(async r=>{console.log(r.status,await r.text());process.exit(r.ok?0:1)},e=>{console.error(e);process.exit(1)})"
-
-# attachments-sweep — every day 02:00 (removes files soft-deleted more than 90 days ago)
-0 2 * * * node -e "fetch('http://ugt-lube-monitoring:3000/ugt-lube-monitoring/api/cron/attachments-sweep',{method:'POST',headers:{authorization:'Bearer '+process.env.CRON_SECRET},signal:AbortSignal.timeout(600000)}).then(async r=>{console.log(r.status,await r.text());process.exit(r.ok?0:1)},e=>{console.error(e);process.exit(1)})"

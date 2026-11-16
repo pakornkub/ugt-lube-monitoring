@@ -7,7 +7,7 @@ import { deleteStoredFile } from '@/lib/storage';
 import { retentionCutoff } from '@/lib/jobs/retention-cutoff';
 
 /**
- * Attachment retention sweep — called only by the compose cron service (jobs.crontab).
+ * Attachment retention sweep — called only by the compose cron service (docker-compose.yml).
  *   1. bytes + row of attachments soft-deleted longer than RETENTION_DAYS
  *   2. files on the volume with no row at all (the row insert failed after the write)
  * Both attachment tables have a real FK to their owner (asset / standard), so there
