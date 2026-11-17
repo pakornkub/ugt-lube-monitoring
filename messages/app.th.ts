@@ -12,6 +12,7 @@ export const appTh = {
   },
   upload: {
     badRequest: 'คำขอไม่ถูกต้อง',
+    tooLarge: 'ไฟล์ใหญ่เกินกว่าที่ระบบรับได้',
     badPeriod: 'งวดไม่ถูกต้อง',
     badKind: 'ชนิดผลตรวจไม่ถูกต้อง',
     standardNotFound: 'ไม่พบมาตรฐานนี้',

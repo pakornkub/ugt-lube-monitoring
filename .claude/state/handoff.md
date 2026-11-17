@@ -1,6 +1,6 @@
 # Handoff
 
-Last updated: 2026-11-16
+Last updated: 2026-11-17
 
 <!-- ของสด: งานถึงไหน คิวอะไรต่อ ติดคำถามอะไร — โหลดเข้า context ทุก session ผ่าน
      CLAUDE.md import · อัปเดตผ่าน /ugt-handoff ตอนจบทุก work chunk แล้ว commit
@@ -21,12 +21,22 @@ Last updated: 2026-11-16
   mode once that skill ships). Never tested here: real SSO login, SMTP delivery, Jenkins/Docker deploy, the
   compose `cron` service
 - Jenkins/SonarQube job ready → push `develop` → 10 stages green → merge PR #1
+- Not committed yet: the 2026-11-17 system-test fixes + the smoke files (`docker-compose.smoke.yml`,
+  `smoke/`, `docs/project-context/system-test.md`, `.claude/launch.json`)
+- `/ugt-contribute` the two kit bugs found by the system test: upload body cut at 10 MB by `proxy.ts`
+  (`proxyClientMaxBodySize`), first-admin bootstrap writes no audit row (`admin.bootstrap`)
 
 ## Open Questions
 
-- (none)
+- D1: a user with no role still sees the dashboard (all plants' data, no "waiting for a role" notice) — keep
+  it, or show only the notice? (kit checklist says no data pages; the mail template says "general pages")
+- D2: viewer opens Data Entry read-only (has `dataentry:read`) — confirm that is intended
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
+
+- 2026-11-17 System test, container mode (`docker-compose.smoke.yml`): 33 PASS · 3 FAIL fixed and re-run
+  (upload 10–20 MB, standard editor shown as a raw id, `/admin/setup` without audit) · 2 decisions open ·
+  BLOCKED: compose `cron` service (not in the smoke stack), Thai sort order
 
 - 2026-11-16 Org infra rules (ADR 0007): no shadow DB, owner login for prod+dev, two Jenkins Pipeline jobs,
   scheduled jobs in the compose `cron` service (busybox crond), nginx described in words · kit sync to 4.89.0

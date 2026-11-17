@@ -29,7 +29,17 @@ import {
  */
 export async function POST(request: Request) {
   const t = await getTranslations('app.upload');
-  const form = await request.formData();
+  // Content-Length past the cap → 413 before parsing: proxy.ts cuts the body at
+  // proxyClientMaxBodySize, and a truncated multipart body fails to parse (was a 500).
+  if (Number(request.headers.get('content-length') ?? 0) > env.UPLOAD_MAX_BYTES) {
+    return NextResponse.json({ ok: false, message: t('tooLarge') }, { status: 413 });
+  }
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return NextResponse.json({ ok: false, message: t('badRequest') }, { status: 400 });
+  }
   const file = form.get('file');
   const target = String(form.get('target') ?? '');
   if (!(file instanceof File) || !isTarget(target)) {

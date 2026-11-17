@@ -10,6 +10,8 @@ import { prisma } from '@/lib/prisma';
 import { syncPermissionsIfNeeded } from '@/lib/permissions-sync';
 import { isAdminInitialized } from '@/lib/get-user-permissions';
 import { DEFAULT_ROLES } from '@/lib/permissions';
+import { logAudit } from '@/lib/actions/audit-log';
+import { AUDIT_ACTIONS } from '@/lib/audit-actions';
 
 /**
  * Initialise the admin system:
@@ -62,6 +64,12 @@ export async function initializeAdminAction(): Promise<{
   await prisma.user.update({
     where: { id: session.user.id },
     data: { roleId: 'admin' },
+  });
+  await logAudit({
+    action: AUDIT_ACTIONS.ADMIN_BOOTSTRAP,
+    table_name: 'users',
+    record_id: session.user.id,
+    new_value: { role: 'admin', roles_created: DEFAULT_ROLES.map((r) => r.id) },
   });
 
   redirect('/admin/users'); // the app's own user admin page

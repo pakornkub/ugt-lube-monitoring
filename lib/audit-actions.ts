@@ -24,6 +24,9 @@ export const AUDIT_ACTIONS = {
   LOGOUT: 'logout',
   LOGOUT_SSO: 'logout.sso',
 
+  // First-admin bootstrap — lib/actions/admin-setup.ts
+  ADMIN_BOOTSTRAP: 'admin.bootstrap',
+
   // Attachments — app/api/files/** and lib/actions/attachments.ts
   FILE_UPLOAD: 'file.upload',
   FILE_DOWNLOAD: 'file.download',

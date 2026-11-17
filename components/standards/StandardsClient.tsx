@@ -796,7 +796,7 @@ function DocCard({ standard: s }: { standard: Standard }) {
               day: 'numeric',
             })
           : null,
-        s.updated_by ? `โดย ${s.updated_by}` : null,
+        s.updated_by ? `โดย ${s.updated_by_name ?? s.updated_by}` : null,
       ]
         .filter(Boolean)
         .join(' · ') || '—',

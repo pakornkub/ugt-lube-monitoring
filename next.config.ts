@@ -18,6 +18,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['@prisma/adapter-mssql', 'mssql', 'tedious'],
   // Security headers + the per-request CSP nonce are set in proxy.ts.
   poweredByHeader: false,
+  experimental: {
+    // proxy.ts runs on every request and buffers the body — Next's 10 MB default cut
+    // 10–20 MB attachments mid-stream. 25 MB = UPLOAD_MAX_BYTES default = the nginx cap.
+    proxyClientMaxBodySize: '25mb',
+  },
 };
 
 export default withNextIntl(nextConfig);

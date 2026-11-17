@@ -15,6 +15,7 @@ export const appEn: AppCatalog = {
   },
   upload: {
     badRequest: 'Invalid request',
+    tooLarge: 'File is larger than the system accepts',
     badPeriod: 'Invalid period',
     badKind: 'Invalid reading type',
     standardNotFound: 'Standard not found',

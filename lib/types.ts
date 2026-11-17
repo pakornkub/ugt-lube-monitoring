@@ -160,6 +160,8 @@ export interface Standard {
   version: number | null;
   updated_at: string | null;
   updated_by: string | null;
+  /** Name (or email) of updated_by — the id itself when that user no longer exists. */
+  updated_by_name?: string | null;
   /** Alarm param keys this standard applies to (e.g. ["vel", "acc"]). */
   related_params: string[] | null;
   /** Asset types this standard applies to (e.g. ["Pump", "Gearbox"]). */
