@@ -21,10 +21,10 @@ Last updated: 2026-11-17
   mode once that skill ships). Never tested here: real SSO login, SMTP delivery, Jenkins/Docker deploy, the
   compose `cron` service
 - Jenkins/SonarQube job ready → push `develop` → 10 stages green → merge PR #1
-- Not committed yet: the 2026-11-17 system-test fixes + the smoke files (`docker-compose.smoke.yml`,
-  `smoke/`, `docs/project-context/system-test.md`, `.claude/launch.json`)
-- `/ugt-contribute` the two kit bugs found by the system test: upload body cut at 10 MB by `proxy.ts`
-  (`proxyClientMaxBodySize`), first-admin bootstrap writes no audit row (`admin.bootstrap`)
+- Before merging PR #1: `/code-review` (CLAUDE.md rule) — run 2026-11-17, see Done
+- Plugin PR pakornkub/ugt-claude-platform#70 (upload 10 MB body limit + `admin.bootstrap` audit) → once merged
+  and released, `/ugt-nextjs-kit-sync` so `next.config.ts`, `app/api/files/route.ts`, `admin-setup.ts`,
+  `audit-actions.ts` line up with the kit again
 
 ## Open Questions
 
