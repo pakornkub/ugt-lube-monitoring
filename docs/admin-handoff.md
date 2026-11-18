@@ -28,8 +28,7 @@
 
 | Server | รัน script |
 | --- | --- |
-| prod | [`admin-db-setup-prod.sql`](admin-db-setup-prod.sql) |
-| dev | [`admin-db-setup-dev.sql`](admin-db-setup-dev.sql) |
+| prod + dev (เครื่องเดียวกัน) | [`admin-db-setup.sql`](admin-db-setup.sql) |
 
 1. SSMS → เปิด script → เมนู **Query → SQLCMD Mode** (ต้องเปิด ไม่งั้น `:setvar` error)
 2. แทน `CHANGE_ME` ใน 2 บรรทัดบนสุด: `LoginName` (ตามมาตรฐานชื่อ login ขององค์กร) · `LoginPassword` (ห้ามมี `'`) — กรอกตอนรันเท่านั้น ปิดไฟล์โดยไม่ save
@@ -38,10 +37,8 @@
 | script สร้าง | ชื่อ | สิทธิ์ |
 | --- | --- | --- |
 | Database prod · dev — collation `Thai_CI_AS` · Read Committed Snapshot `ON` · Recovery model `Full` · Compatibility level `150` · Containment `None` | `UGT_LubeMonitoring` · `UGT_LubeMonitoring_DEV` | — |
-| Login ของเจ้าของโปรเจค (pakornkub) — **ตัวเดียว ใช้ทั้ง prod และ dev** | ตาม `LoginName` | `db_datareader` · `db_datawriter` · `db_ddladmin` · `GRANT EXECUTE` ใน database ทั้ง 2 ตัว · server role `dbcreator` **server dev เท่านั้น** |
+| Login ของเจ้าของโปรเจค (pakornkub) — **ตัวเดียว ใช้ทั้ง prod และ dev** · default database `UGT_LubeMonitoring_DEV` | ตาม `LoginName` | `db_owner` ใน database ทั้ง 2 ตัว · server role `dbcreator` |
 
-> 2 server: รันไฟล์ละ server ด้วย `LoginName` และรหัสผ่านเดียวกัน
->
 > `dbcreator`: ตอนสร้าง migration Prisma สร้าง database ชั่วคราวแล้วลบเอง (ไม่ต้องสร้าง shadow database ไว้)
 >
 > ⚠️ Recovery model `Full` → **ต้องตั้ง job backup transaction log ของทั้ง 2 database** ไม่งั้นไฟล์ log โตไม่หยุดจน disk เต็ม
@@ -139,8 +136,7 @@ Admin สร้าง reverse proxy ของโปรเจคตามรู�
 
 | ค่า | หาได้ที่ | ค่า |
 | --- | --- | --- |
-| SQL Server prod — host:port | ตาราง A | |
-| SQL Server dev — host:port | ตาราง A | |
+| SQL Server (prod + dev) — host:port | ตาราง A | |
 | ชื่อ login ของเจ้าของโปรเจค (ใช้ทั้ง prod และ dev) | ตาราง A | |
 | รหัสผ่านของ login นั้น | ตาราง A | ⚠️ **ส่งช่องทางปลอดภัย ห้ามกรอกที่นี่** |
 | `APP_PORT` prod | port ที่จัดสรรบน server prod (ทีมพัฒนาใช้ `3000` ไว้ก่อน) | |

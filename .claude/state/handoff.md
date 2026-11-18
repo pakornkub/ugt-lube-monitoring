@@ -14,11 +14,11 @@ Last updated: 2026-11-18
 
 ## Next
 
-- **Re-send `docs/admin-handoff.md` + `docs/admin-db-setup-prod.sql` + `docs/admin-db-setup-dev.sql`** to the admin
-  team — table A is now "DBA runs the script" (2026-11-18); deploy also seeds plants, asset types and the 569 machines.
+- **Re-send `docs/admin-handoff.md` + `docs/admin-db-setup.sql`** to the admin team — table A is now
+  "DBA runs one script" (ADR 0009, 2026-11-18); deploy also seeds plants, asset types and the 569 machines.
   Then: admin values → `.env.local` → full system test on real dev DB + Keycloak + SMTP (`/ugt-nextjs-system-test`
   live mode). Never tested here: real SSO, SMTP delivery, Jenkins/Docker deploy (incl. `db seed` step in
-  `Jenkinsfile`), the compose `cron` service, the DBA scripts on a real SQL Server
+  `Jenkinsfile`), the compose `cron` service, the DBA script on a real SQL Server
 - Jenkins/SonarQube job ready → push `develop` → 10 stages green → merge PR #1
 - Code-review leftovers (not fixed, none breaks the system): permission keys as string literals (~60 call
   sites, `requirePermission(perm: string)` in `lib/actions/guards.ts`) · audit actions `'INSERT'`/`'UPDATE'`
@@ -32,11 +32,10 @@ Last updated: 2026-11-18
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
 
-- 2026-11-18 Plugin 4.92.0: table A of `docs/admin-handoff.md` → DBA scripts `docs/admin-db-setup-prod.sql` +
-  `-dev.sql` (SQLCMD mode, idempotent, `Thai_CI_AS`, RCSI ON, Recovery FULL, compat 150 = SQL Server 2019+,
-  `db_datareader/datawriter/ddladmin` + `GRANT EXECUTE`, `dbcreator` dev only, `LoginName`/`LoginPassword` stay
-  `CHANGE_ME`) · dev DB renamed `UGT_LubeMonitoring_DEV` (org standard) · cicd `verify.mjs` 30/0/0 · script not run
-  on a SQL Server yet
+- 2026-11-18 DBA script `docs/admin-db-setup.sql` (ADR 0009): one SQL Server for prod + dev, owner login `db_owner`
+  + `dbcreator`, default DB `UGT_LubeMonitoring_DEV`, same shape as `ugt-rd-laboratory` (SQLCMD mode, idempotent,
+  `Thai_CI_AS`, RCSI ON, Recovery FULL, compat 150 = SQL Server 2019+, login/password stay `CHANGE_ME`) · table A
+  of `docs/admin-handoff.md` links it · dev DB renamed `_DEV` · not run on a SQL Server yet
 - 2026-11-18 Owner decisions (ADR 0008): D1 keep — no-role users still see the dashboard · Spec 5 keep — oil-change
   due stays `last_update + oil_change_months` · kit sync 4.89.0 → 4.91.1 (`lib/org-email.ts` + test from the kit,
   `audit-actions.ts`/`admin-setup.ts` restamped, `ORG_EMAIL_DOMAINS=ube.co.th,ube.com` in `.env.example`) —
