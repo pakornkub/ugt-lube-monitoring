@@ -16,4 +16,4 @@
 
 - มติเรื่อง design → `docs/DESIGN.md` §10
 - งานถึงไหน / คิวถัดไป / คำถามค้าง → `.claude/state/handoff.md` (โหลดทุก session)
-- สเปกผลิตภัณฑ์ + สูตร Health Score → `PRD.md` · คำขอตั้งค่าเซิร์ฟเวอร์ → `docs/admin-handoff.md`
+- สเปกผลิตภัณฑ์ + สูตร Health Score → `PRD.md` · คำขอตั้งค่าเซิร์ฟเวอร์ → `docs/admin-handoff.md` (+ script DBA `docs/admin-db-setup-prod.sql` / `-dev.sql`)

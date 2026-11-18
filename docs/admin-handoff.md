@@ -1,13 +1,13 @@
 # คำขอตั้งค่าระบบ — UGT Reliability Lube Monitoring (`ugt-lube-monitoring`)
 
-ผู้ขอ: pakornkub (ทีมพัฒนา) · 2026-11-15 (แก้ไข 2026-11-16) · repo: `https://github.com/pakornkub/ugt-lube-monitoring.git`
+ผู้ขอ: pakornkub (ทีมพัฒนา) · 2026-11-15 (แก้ไข 2026-11-18) · repo: `https://github.com/pakornkub/ugt-lube-monitoring.git`
 **ทำเสร็จแล้ว กรอกตาราง "ส่งกลับ" ท้ายไฟล์ แล้วส่งไฟล์นี้คืนทีมพัฒนา** · ชื่อทุกตัวต้องพิมพ์ตามนี้เป๊ะ
 
 ## ขั้นตอนรวม
 
 | # | ใครทำ | ระบบ | ทำอะไร | ดูตาราง |
 | --- | --- | --- | --- | --- |
-| 1 | DBA | SQL Server | สร้าง database 2 ตัว + login ของเจ้าของโปรเจค 1 ตัว (ใช้ทั้ง prod และ dev) | [A](#a-sql-server--database--login) |
+| 1 | DBA | SQL Server | รัน script ในตาราง A — database 2 ตัว + login ของเจ้าของโปรเจค 1 ตัว (ใช้ทั้ง prod และ dev) | [A](#a-sql-server--database--login) |
 | 2 | Admin | Server (Docker host) | เตรียม folder เก็บไฟล์ + ตั้ง backup | [B](#b-server--folder-เก็บไฟล์) |
 | 3 | Admin | Jenkins | สร้าง credential | [C](#c-jenkins--credentials) |
 | 4 | Admin | Jenkins | สร้าง pipeline job 2 ตัว (prod / dev แยกกัน) | [D](#d-jenkins--pipeline-job-prod--dev) |
@@ -24,17 +24,29 @@
 
 ### A. SQL Server — Database + Login
 
-ที่: **SSMS → server ตามคอลัมน์ "Server"** · login ใช้ SQL authentication
+**รัน script ครั้งเดียวจบ — ไม่ต้องสร้างอะไรด้วยมือ** · login ใช้ SQL authentication
 
-| สร้าง | Server | ชื่อ (พิมพ์ตามนี้) | สิทธิ์ที่ต้องให้ |
-| --- | --- | --- | --- |
-| Database prod | prod | `UGT_LubeMonitoring` | — |
-| Database dev | dev | `UGT_LubeMonitoring_Dev` | — |
-| Login ของเจ้าของโปรเจค (pakornkub) — **ตัวเดียว ใช้ทั้ง prod และ dev** | prod + dev (ชื่อเดียวกันทั้ง 2 server) | ตามมาตรฐานชื่อ login ขององค์กร (แจ้งชื่อในตารางส่งกลับ) | ใน `UGT_LubeMonitoring` และ `UGT_LubeMonitoring_Dev`: `db_datareader` · `db_datawriter` · `db_ddladmin` · `GRANT EXECUTE` · **server dev เท่านั้น**: `dbcreator` |
+| Server | รัน script |
+| --- | --- |
+| prod | [`admin-db-setup-prod.sql`](admin-db-setup-prod.sql) |
+| dev | [`admin-db-setup-dev.sql`](admin-db-setup-dev.sql) |
 
-> `dbcreator` บน dev: ตอนสร้าง migration Prisma สร้าง database ชั่วคราวแล้วลบเอง (ไม่ต้องสร้าง shadow database ไว้) · server prod ไม่ต้องให้สิทธิ์นี้
+1. SSMS → เปิด script → เมนู **Query → SQLCMD Mode** (ต้องเปิด ไม่งั้น `:setvar` error)
+2. แทน `CHANGE_ME` ใน 2 บรรทัดบนสุด: `LoginName` (ตามมาตรฐานชื่อ login ขององค์กร) · `LoginPassword` (ห้ามมี `'`) — กรอกตอนรันเท่านั้น ปิดไฟล์โดยไม่ save
+3. F5 → ผลตรวจท้าย script ต้องเป็น `1` ทุกคอลัมน์ → แจ้งชื่อ login ในตารางส่งกลับ (รหัสส่งช่องทางปลอดภัย)
+
+| script สร้าง | ชื่อ | สิทธิ์ |
+| --- | --- | --- |
+| Database prod · dev — collation `Thai_CI_AS` · Read Committed Snapshot `ON` · Recovery model `Full` · Compatibility level `150` · Containment `None` | `UGT_LubeMonitoring` · `UGT_LubeMonitoring_DEV` | — |
+| Login ของเจ้าของโปรเจค (pakornkub) — **ตัวเดียว ใช้ทั้ง prod และ dev** | ตาม `LoginName` | `db_datareader` · `db_datawriter` · `db_ddladmin` · `GRANT EXECUTE` ใน database ทั้ง 2 ตัว · server role `dbcreator` **server dev เท่านั้น** |
+
+> 2 server: รันไฟล์ละ server ด้วย `LoginName` และรหัสผ่านเดียวกัน
 >
-> ตารางและข้อมูลตั้งต้น (โรงงาน ประเภทเครื่อง เครื่องจักร 569 เครื่อง) สร้างเองตอน deploy (pipeline รัน migration + seed) — DBA ไม่ต้องสร้างตาราง · database ทั้ง 2 ใช้ collation แบบไม่แยกตัวพิมพ์ใหญ่-เล็ก เช่น `Thai_CI_AS` (ระบบค้นหาเครื่องจักรอาศัยค่านี้) · SQL Server 2017 ขึ้นไป (ทดสอบ migration แล้วบน 2019)
+> `dbcreator`: ตอนสร้าง migration Prisma สร้าง database ชั่วคราวแล้วลบเอง (ไม่ต้องสร้าง shadow database ไว้)
+>
+> ⚠️ Recovery model `Full` → **ต้องตั้ง job backup transaction log ของทั้ง 2 database** ไม่งั้นไฟล์ log โตไม่หยุดจน disk เต็ม
+>
+> ตารางและข้อมูลตั้งต้น (โรงงาน ประเภทเครื่อง เครื่องจักร 569 เครื่อง) สร้างเองตอน deploy (pipeline รัน migration + seed) — DBA ไม่ต้องสร้างตาราง · Compatibility level `150` = SQL Server 2019 ขึ้นไป
 
 
 ### B. Server — Folder เก็บไฟล์

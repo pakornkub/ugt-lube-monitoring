@@ -9,15 +9,16 @@ Last updated: 2026-11-18
 
 ## In progress
 
-- Nothing in progress — PR pakornkub/ugt-lube-monitoring#1 (branch `org-standard-setup`) pushed at `c0d0ed8`;
-  `/code-review` done. Waiting on the admin team (`docs/admin-handoff.md`). Smoke stack is down (`down -v`).
+- Nothing in progress — PR pakornkub/ugt-lube-monitoring#1 (branch `org-standard-setup`); `/code-review` done.
+  Waiting on the admin team (`docs/admin-handoff.md`). Smoke stack is down (`down -v`).
 
 ## Next
 
-- **Re-send `docs/admin-handoff.md`** to the admin team — changed again 2026-11-18 (deploy now seeds plants,
-  asset types and the 569 machines). Then: admin values → `.env.local` → full system test on real dev DB +
-  Keycloak + SMTP (`/ugt-nextjs-system-test` live mode). Never tested here: real SSO, SMTP delivery,
-  Jenkins/Docker deploy (incl. `db seed` step in `Jenkinsfile`), the compose `cron` service
+- **Re-send `docs/admin-handoff.md` + `docs/admin-db-setup-prod.sql` + `docs/admin-db-setup-dev.sql`** to the admin
+  team — table A is now "DBA runs the script" (2026-11-18); deploy also seeds plants, asset types and the 569 machines.
+  Then: admin values → `.env.local` → full system test on real dev DB + Keycloak + SMTP (`/ugt-nextjs-system-test`
+  live mode). Never tested here: real SSO, SMTP delivery, Jenkins/Docker deploy (incl. `db seed` step in
+  `Jenkinsfile`), the compose `cron` service, the DBA scripts on a real SQL Server
 - Jenkins/SonarQube job ready → push `develop` → 10 stages green → merge PR #1
 - Code-review leftovers (not fixed, none breaks the system): permission keys as string literals (~60 call
   sites, `requirePermission(perm: string)` in `lib/actions/guards.ts`) · audit actions `'INSERT'`/`'UPDATE'`
@@ -31,6 +32,11 @@ Last updated: 2026-11-18
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
 
+- 2026-11-18 Plugin 4.92.0: table A of `docs/admin-handoff.md` → DBA scripts `docs/admin-db-setup-prod.sql` +
+  `-dev.sql` (SQLCMD mode, idempotent, `Thai_CI_AS`, RCSI ON, Recovery FULL, compat 150 = SQL Server 2019+,
+  `db_datareader/datawriter/ddladmin` + `GRANT EXECUTE`, `dbcreator` dev only, `LoginName`/`LoginPassword` stay
+  `CHANGE_ME`) · dev DB renamed `UGT_LubeMonitoring_DEV` (org standard) · cicd `verify.mjs` 30/0/0 · script not run
+  on a SQL Server yet
 - 2026-11-18 Owner decisions (ADR 0008): D1 keep — no-role users still see the dashboard · Spec 5 keep — oil-change
   due stays `last_update + oil_change_months` · kit sync 4.89.0 → 4.91.1 (`lib/org-email.ts` + test from the kit,
   `audit-actions.ts`/`admin-setup.ts` restamped, `ORG_EMAIL_DOMAINS=ube.co.th,ube.com` in `.env.example`) —
@@ -52,7 +58,3 @@ Last updated: 2026-11-18
 - 2026-11-15 Smoke test on SQL Server LocalDB + fixes: sidebar logo and sort link under basePath, "Last update" moves
   forward with new readings, batched recompute-all (6.4 s → 0.4 s), audit RecordId length, import keeps install date,
   files removed with their machine/standard, maintenance order, collation note in admin handoff
-- 2026-11-15 `/ugt-nextjs-full-setup` (preserve mode): Next 16 / React 19 / Tailwind v4 ·
-  Supabase → Prisma + SQL Server (Demo Mode + Local Store removed) · Better Auth SSO (Keycloak) +
-  existing RBAC · shadcn base-mira kit + Inter/Noto Sans Thai · SMTP mail · attachments on a
-  Docker volume · Vitest/ESLint/Prettier/husky · Jenkins + Docker + SonarQube
