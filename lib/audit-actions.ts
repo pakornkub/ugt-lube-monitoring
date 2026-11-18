@@ -1,5 +1,5 @@
-// kit: ugt-nextjs-platform 4.79.0 · ugt-nextjs-auth-setup/lib/audit-actions.ts
-// kit-hash: 051abfbd5ed7
+// kit: ugt-nextjs-platform 4.91.0 · ugt-nextjs-auth-setup/lib/audit-actions.ts
+// kit-hash: a2d1481ba6fc
 /**
  * Audit action keys — single source of truth for every string written to
  * `ActivityLogs.action`.
@@ -24,7 +24,7 @@ export const AUDIT_ACTIONS = {
   LOGOUT: 'logout',
   LOGOUT_SSO: 'logout.sso',
 
-  // First-admin bootstrap — lib/actions/admin-setup.ts
+  // First-admin bootstrap — lib/actions/admin-setup.ts (/admin/setup)
   ADMIN_BOOTSTRAP: 'admin.bootstrap',
 
   // Attachments — app/api/files/** and lib/actions/attachments.ts

@@ -24,18 +24,17 @@ Last updated: 2026-11-18
   as literals not `AUDIT_ACTIONS` · `saveReading` audits even when nothing changed · duplicated `authorized()`
   in both cron routes and table-only twins in `lib/actions/attachments.ts` · missing `Id` on 3 tables (see
   architecture.md ⚠ deviation)
-- Plugin PR pakornkub/ugt-claude-platform#70 (upload 10 MB body limit + `admin.bootstrap` audit) → once merged
-  and released, `/ugt-nextjs-kit-sync`
 
 ## Open Questions
 
-- D1 (owner): a user with no role still sees the dashboard (all plants' data, no "waiting for a role"
-  notice) — keep it, or show only the notice? The owner's role matrix has no column for this case
-- Spec 5 (owner): "Last update" now moves with every new reading (fix of 2026-11-15), and the oil-change due
-  date is `last_update + oil_change_months` (`components/drilldown/DrillDownClient.tsx:346`) — a machine sampled
-  monthly never reaches "due". Base the due date on the last oil change (maintenance record) instead?
+- None
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
+
+- 2026-11-18 Owner decisions (ADR 0008): D1 keep — no-role users still see the dashboard · Spec 5 keep — oil-change
+  due stays `last_update + oil_change_months` · kit sync 4.89.0 → 4.91.1 (`lib/org-email.ts` + test from the kit,
+  `audit-actions.ts`/`admin-setup.ts` restamped, `ORG_EMAIL_DOMAINS=ube.co.th,ube.com` in `.env.example`) —
+  plugin PR #70 was merged and released in 4.91.0
 
 - 2026-11-18 `/code-review` of PR #1 (Standards + Spec) → fixed in `c0d0ed8`: deploy runs `prisma db seed`
   (`Jenkinsfile`) · CHECK `Assets_Health_ck` 0–100 (new migration) · `/admin/audit` → 308 `/admin/audit-logs`
