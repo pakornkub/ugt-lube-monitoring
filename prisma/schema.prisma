@@ -305,7 +305,8 @@ model standardAttachment {
 
 model notificationConfig {
   id                     Int      @id @default(1)     @map("Id")
-  from_email             String   @default("alerts@ugt-reliability.com") @db.NVarChar(255) @map("FromEmail")
+  /// Unused since the SMTP relay move — mail always leaves as SMTP_FROM (ADR 0006). Kept to avoid a drop migration.
+  from_email            String   @default("alerts@ugt-reliability.com") @db.NVarChar(255) @map("FromEmail")
   /// JSON string[]
   email_recipients       String   @default("[]") @db.NVarChar(Max) @map("EmailRecipients")
   enable_critical_alerts Boolean  @default(true)      @map("EnableCriticalAlerts")

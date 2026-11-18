@@ -6,8 +6,6 @@ import { getOwnPermissions, getSessionUser } from '@/lib/profile';
 
 export interface EmailPayload {
   to: string[];
-  /** Kept for existing callers; the relay sends as SMTP_FROM (an address it authorises). */
-  from: string;
   subject: string;
   html: string;
 }

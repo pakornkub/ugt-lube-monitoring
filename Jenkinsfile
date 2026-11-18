@@ -282,6 +282,9 @@ pipeline {
                         //      surrounding quotes AND Windows CRLF that docker
                         //      --env-file does not remove.
                         //      Delete this sh block if the project has no database.
+                        //      Then `prisma db seed` (prisma/seed.ts): plants, asset types,
+                        //      alarm params, standards, the 569 machines — create-only, so
+                        //      every deploy may re-run it without touching admin edits.
                         //      set +x + `-e DATABASE_URL` (name only, value from the
                         //      exported env): Jenkins runs sh with -x, so the trace
                         //      would print the full connection string — password
@@ -293,9 +296,9 @@ pipeline {
                           docker run --rm \\
                             -e DATABASE_URL \\
                             -e SKIP_ENV_VALIDATION=1 \\
-                            --entrypoint npx \\
+                            --entrypoint sh \\
                             ${migImage} \\
-                            prisma migrate deploy
+                            -c 'npx prisma migrate deploy && npx prisma db seed'
                         """
 
                         // [VOLUME] เตรียม path ข้อมูลถาวรครั้งแรก (idempotent) — chown ผ่าน container

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { env } from '@/lib/env';
 import { getNotificationConfig } from '@/lib/queries/notifications';
 import { hasPermission } from '@/lib/queries/permissions';
 import { NotificationConfigClient } from '@/components/admin/NotificationConfigClient';
@@ -10,5 +11,5 @@ export default async function NotificationConfigPage() {
   if (!canManage) redirect('/dashboard');
 
   const config = await getNotificationConfig();
-  return <NotificationConfigClient initialConfig={config} />;
+  return <NotificationConfigClient initialConfig={config} sender={env.SMTP_FROM ?? null} />;
 }

@@ -6,7 +6,6 @@ import { requirePermission } from './guards';
 import { sendEmail } from '@/lib/email/send';
 import { execSummaryEmail } from '@/lib/email/exec-summary';
 import { getDashboardData } from '@/lib/queries/assets';
-import { getNotificationConfig } from '@/lib/queries/notifications';
 import { getActionReasons } from '@/lib/queries/action-reasons';
 import {
   EXEC_MAX_CRITICAL,
@@ -58,7 +57,7 @@ export async function sendReportEmail(input: {
   const note = String(input.note ?? '').slice(0, 500);
 
   try {
-    const [{ data }, cfg] = await Promise.all([getDashboardData(site), getNotificationConfig()]);
+    const { data } = await getDashboardData(site);
     const crit = data.topCritical
       .filter((a) => a.status === 'Critical')
       .slice(0, EXEC_MAX_CRITICAL);
@@ -82,7 +81,6 @@ export async function sendReportEmail(input: {
     });
     const res = await sendEmail({
       to,
-      from: cfg.from_email,
       subject: email.subject,
       html: email.html,
     });

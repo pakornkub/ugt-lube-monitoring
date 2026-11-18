@@ -29,10 +29,12 @@ const TOGGLES: { key: keyof NotificationConfig; label: string; hint: string }[] 
   },
 ];
 
-export function NotificationConfigClient({ initialConfig }: { initialConfig: NotificationConfig }) {
+export function NotificationConfigClient({
+  initialConfig,
+  sender,
+}: Readonly<{ initialConfig: NotificationConfig; sender: string | null }>) {
   const router = useRouter();
   const toast = useToast();
-  const [fromEmail, setFromEmail] = useState(initialConfig.from_email);
   const [recipients, setRecipients] = useState(initialConfig.email_recipients.join(', '));
   const [toggles, setToggles] = useState({
     enable_critical_alerts: initialConfig.enable_critical_alerts,
@@ -74,7 +76,6 @@ export function NotificationConfigClient({ initialConfig }: { initialConfig: Not
   async function onSave() {
     setSaving(true);
     const res = await saveNotificationConfig({
-      from_email: fromEmail,
       email_recipients: recipients
         .split(/[,;]/)
         .map((s) => s.trim())
@@ -113,15 +114,13 @@ export function NotificationConfigClient({ initialConfig }: { initialConfig: Not
 
       <Card>
         <div className="space-y-2.5">
-          <label className="block">
-            <span className="mb-1 block text-[13px] font-bold text-t3">อีเมลผู้ส่ง (From Email) *</span>
-            <input
-              value={fromEmail}
-              onChange={(e) => setFromEmail(e.target.value)}
-              placeholder="alerts@ugt-reliability.com"
-              className={INP}
-            />
-          </label>
+          {/* The org relay only accepts its authorised sender (SMTP_FROM, set by the server
+              admin) — an editable From field here would be ignored. */}
+          <div>
+            <span className="mb-1 block text-[13px] font-bold text-t3">อีเมลผู้ส่ง (From Email)</span>
+            <p className="text-[14px]">{sender ?? 'ยังไม่ได้ตั้งค่า SMTP_FROM บนเซิร์ฟเวอร์'}</p>
+            <p className="text-[12px] text-t3">กำหนดโดยผู้ดูแลเซิร์ฟเวอร์ — แก้จากหน้านี้ไม่ได้</p>
+          </div>
           <label className="block">
             <span className="mb-1 block text-[13px] font-bold text-t3">
               ผู้รับอีเมล (คั่นด้วย , หรือ ;)

@@ -35,7 +35,6 @@ async function run(request: Request) {
     const { subject, html } = await buildWeeklyDigest(true);
     const result = await sendEmail({
       to: cfg.email_recipients,
-      from: cfg.from_email,
       subject,
       html,
     });

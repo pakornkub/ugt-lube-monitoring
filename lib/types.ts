@@ -35,7 +35,6 @@ export interface Permission {
 
 export interface NotificationConfig {
   id: number;
-  from_email: string;
   email_recipients: string[];
   enable_critical_alerts: boolean;
   enable_weekly_summary: boolean;

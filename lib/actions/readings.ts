@@ -207,8 +207,9 @@ export async function saveOilBatch(rows: OilBatchRow[]): Promise<BatchResult> {
         );
         saved.push(...g);
       } catch (e) {
-        for (const r of g)
-          fail(r.asset_id, r.period, e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+        // The DB error stays in the server log — its text (table/constraint names) never reaches the browser.
+        console.error('[saveOilBatch]', e);
+        for (const r of g) fail(r.asset_id, r.period, 'บันทึกไม่สำเร็จ — ลองใหม่ หรือแจ้งผู้ดูแลระบบ');
       }
     }
 

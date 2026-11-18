@@ -18,11 +18,10 @@ export async function GET(
   const notFound = NextResponse.json({ ok: false, message: 'ไม่พบไฟล์' }, { status: 404 });
   if (!isTarget(target)) return notFound;
 
-  const perm = await requirePermission('attachments:read');
-  if (!perm.ok) return NextResponse.json(perm.error, { status: 403 });
+  // 404 for "missing", "no permission" and "not your plant" alike — a 403 would confirm the id exists.
+  if (!(await requirePermission('attachments:read')).ok) return notFound;
 
   const row = await findAttachment(target, id);
-  // 404 for both "missing" and "not your plant" — a different status would confirm the id exists.
   if (!row) return notFound;
   if (row.asset_id && !(await requireAssetPermission('attachments:read', row.asset_id)).ok)
     return notFound;

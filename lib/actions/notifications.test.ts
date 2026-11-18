@@ -25,7 +25,6 @@ vi.mock('@/lib/email/weekly-digest-build', () => ({
 }));
 vi.mock('@/lib/queries/notifications', () => ({
   getNotificationConfig: async () => ({
-    from_email: 'a@x.co',
     email_recipients: ['r1@x.co', 'r2@x.co'],
   }),
 }));

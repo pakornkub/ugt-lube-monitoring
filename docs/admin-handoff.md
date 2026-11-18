@@ -34,7 +34,7 @@
 
 > `dbcreator` บน dev: ตอนสร้าง migration Prisma สร้าง database ชั่วคราวแล้วลบเอง (ไม่ต้องสร้าง shadow database ไว้) · server prod ไม่ต้องให้สิทธิ์นี้
 >
-> ตารางสร้างเองตอน deploy (pipeline รัน migration) — DBA ไม่ต้องสร้างตาราง · database ทั้ง 2 ใช้ collation แบบไม่แยกตัวพิมพ์ใหญ่-เล็ก เช่น `Thai_CI_AS` (ระบบค้นหาเครื่องจักรอาศัยค่านี้) · SQL Server 2017 ขึ้นไป (ทดสอบ migration แล้วบน 2019)
+> ตารางและข้อมูลตั้งต้น (โรงงาน ประเภทเครื่อง เครื่องจักร 569 เครื่อง) สร้างเองตอน deploy (pipeline รัน migration + seed) — DBA ไม่ต้องสร้างตาราง · database ทั้ง 2 ใช้ collation แบบไม่แยกตัวพิมพ์ใหญ่-เล็ก เช่น `Thai_CI_AS` (ระบบค้นหาเครื่องจักรอาศัยค่านี้) · SQL Server 2017 ขึ้นไป (ทดสอบ migration แล้วบน 2019)
 
 
 ### B. Server — Folder เก็บไฟล์

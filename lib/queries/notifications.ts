@@ -4,7 +4,6 @@ import type { NotificationConfig } from '@/lib/types';
 
 const DEFAULT_CONFIG: NotificationConfig = {
   id: 1,
-  from_email: 'alerts@ugt-reliability.com',
   email_recipients: [],
   enable_critical_alerts: true,
   enable_weekly_summary: false,
@@ -17,7 +16,6 @@ export async function getNotificationConfig(): Promise<NotificationConfig> {
   if (!row) return DEFAULT_CONFIG;
   return {
     id: row.id,
-    from_email: row.from_email,
     email_recipients: parseList(row.email_recipients),
     enable_critical_alerts: row.enable_critical_alerts,
     enable_weekly_summary: row.enable_weekly_summary,

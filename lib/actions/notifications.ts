@@ -18,7 +18,6 @@ const testLimit = createRateLimiter(10, 60 * 60 * 1000); // 10 test sends / hour
 const allLimit = createRateLimiter(3, 24 * 60 * 60 * 1000); // 3 sends to everyone / day
 
 export interface NotificationConfigInput {
-  from_email: string;
   email_recipients: string[];
   enable_critical_alerts: boolean;
   enable_weekly_summary: boolean;
@@ -30,10 +29,8 @@ export async function saveNotificationConfig(
   return runAction(async () => {
     const auth = await requirePermission('notifications:manage');
     if (!auth.ok) return auth.error;
-    if (!input.from_email.trim()) return { ok: false, message: 'กรุณาระบุอีเมลผู้ส่ง' };
 
     const data = {
-      from_email: input.from_email.trim(),
       email_recipients: toList(input.email_recipients),
       enable_critical_alerts: input.enable_critical_alerts,
       enable_weekly_summary: input.enable_weekly_summary,
@@ -111,7 +108,6 @@ export async function sendWeeklyDigestNow(input: {
     const email = await buildWeeklyDigest(!input.test);
     const res = await sendEmail({
       to,
-      from: cfg.from_email,
       subject: input.test ? `[ทดสอบ] ${email.subject}` : email.subject,
       html: email.html,
     });

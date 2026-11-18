@@ -63,4 +63,14 @@ describe('saveOilBatch', () => {
     expect(audit.map((a) => a.recordId)).toEqual(['A/2026-09', 'C/2026-09', 'B/2026-09']);
     expect(JSON.parse(audit[0].oldValue!)).toEqual({ fe: 99, visc: null });
   });
+
+  it('keeps the raw DB error out of the message the browser gets', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    transaction.mockRejectedValueOnce(
+      new Error('Invalid `prisma.oilReading.upsert()`: CHECK constraint "OilReadings_ck"')
+    );
+    const res = await saveOilBatch([{ assetId: 'B', period: '2026-09', values: { visc: 46 } }]);
+    expect(res.failedKeys).toEqual(['B|2026-09']);
+    expect(JSON.stringify(res)).not.toMatch(/prisma|OilReadings_ck/);
+  });
 });
