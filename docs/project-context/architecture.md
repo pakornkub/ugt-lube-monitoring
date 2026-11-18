@@ -26,7 +26,9 @@ Vitest · Jenkins + Docker + SonarQube. basePath prod `/ugt-lube-monitoring`, de
 - `lib/storage.ts` + `app/api/files/**` — ไฟล์แนบบน Docker volume (`STORAGE_ROOT`)
 - `lib/profile.ts` (ผู้ใช้ปัจจุบัน + "view as") · `lib/queries/permissions.ts` (สิทธิ์ + plant scope) ·
   `lib/actions/guards.ts` (`requirePermission` / `requireAssetPermission`)
-- `prisma/schema.prisma` · `prisma/migrations/0_init` · `prisma/seed.ts` + `seed-data/reference.json`
+- `prisma/schema.prisma` · `prisma/migrations/0_init` + `20261117000000_assets_health_range` (CHECK เขียนมือ — Prisma
+  ประกาศไม่ได้) · `prisma/seed.ts` + `seed-data/reference.json` — Jenkins Deploy รัน `migrate deploy && db seed`
+  ทุกครั้ง (seed เพิ่มเฉพาะที่ยังไม่มี ไม่ทับค่าที่ admin แก้) (2026-11-18)
 
 ## Data flow หลัก
 
@@ -43,7 +45,7 @@ Vitest · Jenkins + Docker + SonarQube. basePath prod `/ugt-lube-monitoring`, de
 
 | ตาราง | ของ feature | หมายเหตุ |
 | --- | --- | --- |
-| `Assets` | เครื่องจักร 569 ตัว (seed) | `Health`/`Status` เขียนโดย `recompute.ts` เท่านั้น |
+| `Assets` | เครื่องจักร 569 ตัว (seed) | `Health`/`Status` เขียนโดย `recompute.ts` เท่านั้น · CHECK `Assets_Health_ck` 0–100 |
 | `OilReadings` · `VibReadings` | ผลตรวจรายเดือน | unique (AssetId, Period) |
 | `AlarmParams` · `ScoreConfigs` · `AssetAlarmOverrides` · `AssetScoreOverrides` | เกณฑ์ + น้ำหนักคะแนน | |
 | `MaintenanceRecords` | ประวัติซ่อม (drill-down) | |
@@ -63,6 +65,12 @@ Vitest · Jenkins + Docker + SonarQube. basePath prod `/ugt-lube-monitoring`, de
   เดิม แทน `Attachments` polymorphic + `files:*` ของ kit (2026-11-15) — ADR 0004
 - ⚠ deviation: หน้า admin users/roles/audit-logs/notifications เป็นของโปรเจคเอง (`lib/actions/users.ts`, `roles.ts`)
   ไม่ใช่ kit — มี site scope, เมนูต่อ role, "view as"; กันล็อกตัวเองด้วย `managersLeft` (2026-11-15)
+- ⚠ deviation: `Sites` (PK `Code`), `AssetTypes` (PK `TypeName`), `AssetScoreOverrides` (PK `AssetId`) ใช้ natural key
+  ไม่มีคอลัมน์ `Id` ตามแบบ Supabase เดิม (เจอใน `/code-review` 2026-11-18 — ยังไม่ได้ตัดสินว่าจะเพิ่ม `Id` ไหม)
+- ⚠ deviation: `lib/base-path.ts` + `app/(auth)/login/sso-login-button.tsx` อ่าน `process.env.NEXT_PUBLIC_BASE_PATH`
+  ตรง ๆ — ผ่าน `createEnv()` ได้ `''` ใน client bundle (2026-11-18)
+- อีเมลรายงาน/digest ออกจาก `SMTP_FROM` เสมอ — หน้า `/admin/notifications` แสดงแบบอ่านอย่างเดียว · คอลัมน์
+  `NotificationConfigs.FromEmail` ไม่ได้ใช้แล้วแต่คงไว้ (ไม่ต้อง migration ลบ) (2026-11-18) — ADR 0006
 
 ## Permissions
 
