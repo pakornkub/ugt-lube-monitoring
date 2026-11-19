@@ -16,9 +16,8 @@ Last updated: 2026-11-19
 ## Next
 
 - Admin values are in `.env` / `.env.dev` / `.env.local` (2026-11-19). **`.env.local` still points at the prod DB
-  `UGT_LubeMonitoring`** — switch it to `UGT_LubeMonitoring_DEV` before `npm run dev`. Then: first SSO login on dev →
-  `/admin/setup`, full system test on dev (`/ugt-nextjs-system-test` live mode). Not tested yet: real SSO, SMTP
-  delivery through the org relay, the compose `cron` service (prod only)
+  `UGT_LubeMonitoring`** — switch it to `UGT_LubeMonitoring_DEV` before `npm run dev`. Dev live test left BLOCKED:
+  a `SiteAccess`-limited second account, lab Excel re-import overwrite prompt, logout · the compose `cron` service (prod only)
 - Prod: admin adds Jenkins Secret file `env-ugt-lube-monitoring` (+ check `-dev`) → Build Now on the prod job
 - Code-review leftovers (not fixed, none breaks the system): permission keys as string literals (~60 call
   sites, `requirePermission(perm: string)` in `lib/actions/guards.ts`) · audit actions `'INSERT'`/`'UPDATE'`
@@ -31,6 +30,13 @@ Last updated: 2026-11-19
 - None
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
+
+- 2026-11-19 Live test on dev (build #4) vs upstream `theerametViset/UGT-lube-monitoring` (head = our `9a0b9d6`):
+  17 PASS · 0 FAIL · 3 BLOCKED (a `SiteAccess`-limited user, lab Excel overwrite prompt, logout). Mail: report +
+  digest test sent through the org relay with `dev-mode:enable` on the admin role (both reached the inbox — confirmed by the owner; permission removed after).
+  Scoring code (`lib/scoring/*`, `lib/viscosity-limits.ts`) identical to upstream after prettier; a `[TEST]` reading
+  scored 45/Warning on dev = upstream `getDeductionBreakdown`. Every upstream page exists; differences = ADR 0001/0004/0005.
+  `[TEST]` machine deleted (readings + file cascade). Audit time shows UTC — same as upstream (`created_at.slice`)
 
 - 2026-11-19 OWASP leftovers on `develop`: `package.json` `overrides` pin `mysql2` ^3.24.6 (GHSA-3f6p-5ww8-9rcr,
   GHSA-rgwj-5xj2-c3m3 — pulled in by `better-auth` + `prisma`) and `deepmerge-ts` ^8.0.2 (GHSA-ggr8-5vv4-36mx — used
