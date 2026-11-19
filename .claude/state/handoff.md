@@ -9,8 +9,8 @@ Last updated: 2026-11-19
 
 ## In progress
 
-- Nothing in progress — PR pakornkub/ugt-lube-monitoring#1 (branch `org-standard-setup`); `/code-review` done.
-  Waiting on the admin team (`docs/admin-handoff.md`). Smoke stack is down (`down -v`).
+- Nothing in progress — PR pakornkub/ugt-lube-monitoring#1 merged into `main` 2026-11-19 (before any Jenkins run);
+  branch `org-standard-setup` deleted. Waiting on the admin team (`docs/admin-handoff.md`). Smoke stack is down.
 
 ## Next
 
@@ -19,7 +19,7 @@ Last updated: 2026-11-19
   Then: admin values → `.env.local` → full system test on real dev DB + Keycloak + SMTP (`/ugt-nextjs-system-test`
   live mode). Never tested here: real SSO, SMTP delivery, Jenkins/Docker deploy (incl. `db seed` step in
   `Jenkinsfile`), the compose `cron` service, the DBA script on a real SQL Server
-- Jenkins/SonarQube job ready → push `develop` → 10 stages green → merge PR #1
+- Jenkins/SonarQube job ready → create `develop` from `main` and push → 10 stages green on dev, then prod job on `main`
 - Code-review leftovers (not fixed, none breaks the system): permission keys as string literals (~60 call
   sites, `requirePermission(perm: string)` in `lib/actions/guards.ts`) · audit actions `'INSERT'`/`'UPDATE'`
   as literals not `AUDIT_ACTIONS` · `saveReading` audits even when nothing changed · duplicated `authorized()`
