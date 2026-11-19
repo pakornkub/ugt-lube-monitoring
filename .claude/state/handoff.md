@@ -9,17 +9,17 @@ Last updated: 2026-11-19
 
 ## In progress
 
-- Nothing in progress — PR pakornkub/ugt-lube-monitoring#1 merged into `main` 2026-11-19 (before any Jenkins run);
-  branch `org-standard-setup` deleted. Waiting on the admin team (`docs/admin-handoff.md`). Smoke stack is down.
+- Nothing in progress — PR pakornkub/ugt-lube-monitoring#1 merged into `main`; `develop` created from `main` 2026-11-19.
+  Dev is deployed: https://ugtweb.ube.co.th/ugt-lube-monitoring-dev (Jenkins dev #2 — migrations + seed 569 machines,
+  container healthy). Prod job `ugt-lube-monitoring` #2 failed at Deploy: credential `env-ugt-lube-monitoring` missing.
 
 ## Next
 
-- **Re-send `docs/admin-handoff.md` + `docs/admin-db-setup.sql`** to the admin team — table A is now
-  "DBA runs one script" (ADR 0009, 2026-11-18); deploy also seeds plants, asset types and the 569 machines.
-  Then: admin values → `.env.local` → full system test on real dev DB + Keycloak + SMTP (`/ugt-nextjs-system-test`
-  live mode). Never tested here: real SSO, SMTP delivery, Jenkins/Docker deploy (incl. `db seed` step in
-  `Jenkinsfile`), the compose `cron` service, the DBA script on a real SQL Server
-- Jenkins/SonarQube job ready → create `develop` from `main` and push → 10 stages green on dev, then prod job on `main`
+- Admin values are in `.env` / `.env.dev` / `.env.local` (2026-11-19). **`.env.local` still points at the prod DB
+  `UGT_LubeMonitoring`** — switch it to `UGT_LubeMonitoring_DEV` before `npm run dev`. Then: first SSO login on dev →
+  `/admin/setup`, full system test on dev (`/ugt-nextjs-system-test` live mode). Not tested yet: real SSO, SMTP
+  delivery through the org relay, the compose `cron` service (prod only)
+- Prod: admin adds Jenkins Secret file `env-ugt-lube-monitoring` (+ check `-dev`) → Build Now on the prod job
 - Code-review leftovers (not fixed, none breaks the system): permission keys as string literals (~60 call
   sites, `requirePermission(perm: string)` in `lib/actions/guards.ts`) · audit actions `'INSERT'`/`'UPDATE'`
   as literals not `AUDIT_ACTIONS` · `saveReading` audits even when nothing changed · duplicated `authorized()`
@@ -32,6 +32,15 @@ Last updated: 2026-11-19
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
 
+- 2026-11-19 OWASP leftovers on `develop`: `package.json` `overrides` pin `mysql2` ^3.24.6 (GHSA-3f6p-5ww8-9rcr,
+  GHSA-rgwj-5xj2-c3m3 — pulled in by `better-auth` + `prisma`) and `deepmerge-ts` ^8.0.2 (GHSA-ggr8-5vv4-36mx — used
+  by `@prisma/config` to merge `prisma.config.ts`; `prisma validate`/`generate` still work) · Sonar S2245: work-order
+  default in `components/drilldown/MaintenanceTab.tsx` uses `crypto.getRandomValues` · drop the overrides once
+  prisma/better-auth ship the fixed versions themselves
+
+- 2026-11-19 OWASP fix on `develop`: `nodemailer` 7.0.13 → 10.6.0 (20 advisories, `@types/nodemailer` removed —
+  v10 ships its own types; `lib/email.ts` unchanged) · `vite` 8.3.2 → 8.3.8 (test-only, 6 advisories) · checked with
+  tsc, lint, full tests, build and a real SMTP send (3 recipients, Thai subject, attachment) to a local SMTP sink
 - 2026-11-19 Plugin 4.93.0/4.93.1 env standard: `.env` + `.env.dev` created locally (gitignored, fresh
   `BETTER_AUTH_SECRET`/`CRON_SECRET` per file, URLs on `https://ugtweb.ube.co.th`, DB user/password + Keycloak
   secret `CHANGE_ME`) · `.env.local` + `.env.example`: `KEYCLOAK_ISSUER=…/keycloak/realms/ugt`, client
@@ -58,4 +67,3 @@ Last updated: 2026-11-19
   service (not in the smoke stack), Thai sort order
 - 2026-11-16 Org infra rules (ADR 0007): no shadow DB, owner login for prod+dev, two Jenkins Pipeline jobs,
   scheduled jobs in the compose `cron` service (busybox crond), nginx described in words · kit sync to 4.89.0
-- 2026-11-16 Owner decisions: weekly digest stays Monday 13:00 Bangkok; lab period labels keep the Buddhist year (DESIGN.md §10)
