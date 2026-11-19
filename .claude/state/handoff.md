@@ -9,16 +9,17 @@ Last updated: 2026-11-19
 
 ## In progress
 
-- Nothing in progress — PR pakornkub/ugt-lube-monitoring#1 merged into `main`; `develop` created from `main` 2026-11-19.
-  Dev is deployed: https://ugtweb.ube.co.th/ugt-lube-monitoring-dev (Jenkins dev #2 — migrations + seed 569 machines,
-  container healthy). Prod job `ugt-lube-monitoring` #2 failed at Deploy: credential `env-ugt-lube-monitoring` missing.
+- Nothing in progress — `main` = `develop` (PR pakornkub/ugt-lube-monitoring#3, 2026-11-19). Both are deployed:
+  prod https://ugtweb.ube.co.th/ugt-lube-monitoring (Jenkins prod #3 SUCCESS — credential `env-ugt-lube-monitoring`
+  added by the admin, `/api/health` healthy) · dev https://ugtweb.ube.co.th/ugt-lube-monitoring-dev (dev #5 SUCCESS).
 
 ## Next
 
 - Admin values are in `.env` / `.env.dev` / `.env.local` (2026-11-19). **`.env.local` still points at the prod DB
   `UGT_LubeMonitoring`** — switch it to `UGT_LubeMonitoring_DEV` before `npm run dev`. Dev live test left BLOCKED:
   a `SiteAccess`-limited second account, lab Excel re-import overwrite prompt, logout · the compose `cron` service (prod only)
-- Prod: admin adds Jenkins Secret file `env-ugt-lube-monitoring` (+ check `-dev`) → Build Now on the prod job
+- Prod: the first SSO login on an empty DB takes `/admin/setup` and becomes Administrator — the owner should be
+  first (not checked whether anyone has logged in yet) · check the compose `cron` service runs the weekly digest (Monday 13:00) · no tests on prod
 - Code-review leftovers (not fixed, none breaks the system): permission keys as string literals (~60 call
   sites, `requirePermission(perm: string)` in `lib/actions/guards.ts`) · audit actions `'INSERT'`/`'UPDATE'`
   as literals not `AUDIT_ACTIONS` · `saveReading` audits even when nothing changed · duplicated `authorized()`
