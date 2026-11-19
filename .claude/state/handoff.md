@@ -20,9 +20,6 @@ Last updated: 2026-11-19
   `/admin/setup`, full system test on dev (`/ugt-nextjs-system-test` live mode). Not tested yet: real SSO, SMTP
   delivery through the org relay, the compose `cron` service (prod only)
 - Prod: admin adds Jenkins Secret file `env-ugt-lube-monitoring` (+ check `-dev`) → Build Now on the prod job
-- OWASP leftovers after the nodemailer/vite update: `mysql2` 3.15.3 (via `better-auth`, unused — MySQL) and
-  `deepmerge-ts` 7.1.5 (via `prisma` CLI) — override or add to `owasp-suppressions.xml` with the reason · Sonar S2245
-  `Math.random()` work-order default in `components/drilldown/MaintenanceTab.tsx:75` (not security — mark Safe or change)
 - Code-review leftovers (not fixed, none breaks the system): permission keys as string literals (~60 call
   sites, `requirePermission(perm: string)` in `lib/actions/guards.ts`) · audit actions `'INSERT'`/`'UPDATE'`
   as literals not `AUDIT_ACTIONS` · `saveReading` audits even when nothing changed · duplicated `authorized()`
@@ -34,6 +31,12 @@ Last updated: 2026-11-19
 - None
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
+
+- 2026-11-19 OWASP leftovers on `develop`: `package.json` `overrides` pin `mysql2` ^3.24.6 (GHSA-3f6p-5ww8-9rcr,
+  GHSA-rgwj-5xj2-c3m3 — pulled in by `better-auth` + `prisma`) and `deepmerge-ts` ^8.0.2 (GHSA-ggr8-5vv4-36mx — used
+  by `@prisma/config` to merge `prisma.config.ts`; `prisma validate`/`generate` still work) · Sonar S2245: work-order
+  default in `components/drilldown/MaintenanceTab.tsx` uses `crypto.getRandomValues` · drop the overrides once
+  prisma/better-auth ship the fixed versions themselves
 
 - 2026-11-19 OWASP fix on `develop`: `nodemailer` 7.0.13 → 10.6.0 (20 advisories, `@types/nodemailer` removed —
   v10 ships its own types; `lib/email.ts` unchanged) · `vite` 8.3.2 → 8.3.8 (test-only, 6 advisories) · checked with

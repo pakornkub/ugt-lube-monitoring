@@ -72,7 +72,7 @@ export function MaintenanceTab({
                 <span className="mb-1 block text-[13px] font-bold text-t3">เลขที่ใบงาน</span>
                 <input
                   name="wo"
-                  defaultValue={`MNT-${19000 + Math.floor(Math.random() * 999)}`}
+                  defaultValue={`MNT-${19000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 999)}`}
                   className={INP}
                 />
               </label>
