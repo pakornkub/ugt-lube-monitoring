@@ -1,6 +1,6 @@
 # คำขอตั้งค่าระบบ — UGT Reliability Lube Monitoring (`ugt-lube-monitoring`)
 
-ผู้ขอ: pakornkub (ทีมพัฒนา) · 2026-11-15 (แก้ไข 2026-11-18) · repo: `https://github.com/pakornkub/ugt-lube-monitoring.git`
+ผู้ขอ: pakornkub (ทีมพัฒนา) · 2026-11-15 (แก้ไข 2026-11-19) · repo: `https://github.com/pakornkub/ugt-lube-monitoring.git`
 **ทำเสร็จแล้ว กรอกตาราง "ส่งกลับ" ท้ายไฟล์ แล้วส่งไฟล์นี้คืนทีมพัฒนา** · ชื่อทุกตัวต้องพิมพ์ตามนี้เป๊ะ
 
 ## ขั้นตอนรวม
@@ -13,7 +13,7 @@
 | 4 | Admin | Jenkins | สร้าง pipeline job 2 ตัว (prod / dev แยกกัน) | [D](#d-jenkins--pipeline-job-prod--dev) |
 | 5 | Admin | GitHub | ตั้ง webhook ไป Jenkins | [E](#e-github--webhook) |
 | 6 | Admin | SonarQube | สร้าง 2 project + Quality Gate + webhook | [F](#f-sonarqube) |
-| 7 | Admin | Keycloak | สร้าง client SSO | [G](#g-keycloak--client-sso) |
+| 7 | Admin | Keycloak | สร้าง client SSO 2 ตัว (prod / dev) | [G](#g-keycloak--client-sso) |
 | 8 | Admin | Nginx | สร้าง reverse proxy ของโปรเจค | [H](#h-nginx--reverse-proxy) |
 | 9 | ทุกคน | — | ส่งค่ากลับทีมพัฒนา | [ส่งกลับ](#ส่งกลับ) |
 
@@ -106,18 +106,18 @@
 
 ### G. Keycloak — Client (SSO)
 
-ที่: **realm `<realm ขององค์กร>` → Clients → Create client** (1 client ต่อ 1 โปรเจค)
+ที่: **realm `ugt` → Clients → Create client** — **2 client** (prod / dev) ตั้งค่าเหมือนกัน ต่างแค่ Client ID กับ redirect URI
 
-| ช่อง | ใส่ค่า |
-| --- | --- |
-| Client type | OpenID Connect |
-| Client ID | `ugt-lube-monitoring` |
-| Client authentication | On |
-| Standard flow | On · ช่องอื่น (Direct access / Implicit / Service accounts) **Off** |
-| Valid redirect URIs | `https://<app-host>/ugt-lube-monitoring-dev/api/auth/callback/keycloak` |
-| 〃 (บรรทัดที่ 2) | `https://<app-host>/ugt-lube-monitoring/api/auth/callback/keycloak` |
-| Web origins | `+` |
-| Advanced → PKCE Method | S256 |
+| ช่อง | client prod | client dev |
+| --- | --- | --- |
+| Client type | OpenID Connect | 〃 |
+| Client ID | `ugt-lube-monitoring` | `ugt-lube-monitoring-dev` |
+| Client authentication | On | 〃 |
+| Standard flow | On · ช่องอื่น (Direct access / Implicit / Service accounts) **Off** | 〃 |
+| Valid redirect URIs | `https://ugtweb.ube.co.th/ugt-lube-monitoring/api/auth/callback/keycloak` | `https://ugtweb.ube.co.th/ugt-lube-monitoring-dev/api/auth/callback/keycloak` |
+| 〃 (บรรทัดที่ 2) | — | `http://localhost:3000/ugt-lube-monitoring-dev/api/auth/callback/keycloak` (เครื่องนักพัฒนา) |
+| Web origins | `+` | `+` |
+| Advanced → PKCE Method | S256 | S256 |
 
 
 ### H. Nginx — Reverse proxy
@@ -141,8 +141,8 @@ Admin สร้าง reverse proxy ของโปรเจคตามรู�
 | รหัสผ่านของ login นั้น | ตาราง A | ⚠️ **ส่งช่องทางปลอดภัย ห้ามกรอกที่นี่** |
 | `APP_PORT` prod | port ที่จัดสรรบน server prod (ทีมพัฒนาใช้ `3000` ไว้ก่อน) | |
 | `APP_PORT` dev | port ที่จัดสรรบน server dev (ทีมพัฒนาใช้ `3001` ไว้ก่อน) | |
-| `KEYCLOAK_ISSUER` | `https://<keycloak-host>/realms/<realm ขององค์กร>` | |
-| `KEYCLOAK_CLIENT_SECRET` | Keycloak → Clients → `ugt-lube-monitoring` → Credentials | ⚠️ **ส่งช่องทางปลอดภัย ห้ามกรอกที่นี่** |
+| `KEYCLOAK_CLIENT_SECRET` prod | Keycloak → Clients → `ugt-lube-monitoring` → Credentials | ⚠️ **ส่งช่องทางปลอดภัย ห้ามกรอกที่นี่** |
+| `KEYCLOAK_CLIENT_SECRET` dev | Keycloak → Clients → `ugt-lube-monitoring-dev` → Credentials | ⚠️ **ส่งช่องทางปลอดภัย ห้ามกรอกที่นี่** |
 | `SMTP_HOST` / `SMTP_PORT` | SMTP relay ภายในองค์กร (relay ที่รับเมลจาก Docker host โดยไม่ต้อง login) | |
 | `SMTP_FROM` | อีเมลผู้ส่งที่ relay อนุญาต (เช่น noreply@…) | |
 | ลิงก์ Jenkins job | หน้า job `ugt-lube-monitoring` และ `ugt-lube-monitoring-dev` | |

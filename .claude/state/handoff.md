@@ -1,6 +1,6 @@
 # Handoff
 
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 <!-- ของสด: งานถึงไหน คิวอะไรต่อ ติดคำถามอะไร — โหลดเข้า context ทุก session ผ่าน
      CLAUDE.md import · อัปเดตผ่าน /ugt-handoff ตอนจบทุก work chunk แล้ว commit
@@ -32,6 +32,11 @@ Last updated: 2026-11-18
 
 ## Done (newest first — keep only ~10; older history lives in git and board.md)
 
+- 2026-11-19 Plugin 4.93.0/4.93.1 env standard: `.env` + `.env.dev` created locally (gitignored, fresh
+  `BETTER_AUTH_SECRET`/`CRON_SECRET` per file, URLs on `https://ugtweb.ube.co.th`, DB user/password + Keycloak
+  secret `CHANGE_ME`) · `.env.local` + `.env.example`: `KEYCLOAK_ISSUER=…/keycloak/realms/ugt`, client
+  `ugt-lube-monitoring-dev`, app name `(DEV)` · `Jenkinsfile`: dev build bakes `NEXT_PUBLIC_APP_NAME … (DEV)`,
+  app URL on ugtweb · `docs/admin-handoff.md` table G = 2 Keycloak clients, return table asks 2 secrets
 - 2026-11-18 DBA script `docs/admin-db-setup.sql` (ADR 0009): one SQL Server for prod + dev, owner login `db_owner`
   + `dbcreator`, default DB `UGT_LubeMonitoring_DEV`, same shape as `ugt-rd-laboratory` (SQLCMD mode, idempotent,
   `Thai_CI_AS`, RCSI ON, Recovery FULL, compat 150 = SQL Server 2019+, login/password stay `CHANGE_ME`) · table A
@@ -54,6 +59,3 @@ Last updated: 2026-11-18
 - 2026-11-16 Org infra rules (ADR 0007): no shadow DB, owner login for prod+dev, two Jenkins Pipeline jobs,
   scheduled jobs in the compose `cron` service (busybox crond), nginx described in words · kit sync to 4.89.0
 - 2026-11-16 Owner decisions: weekly digest stays Monday 13:00 Bangkok; lab period labels keep the Buddhist year (DESIGN.md §10)
-- 2026-11-15 Smoke test on SQL Server LocalDB + fixes: sidebar logo and sort link under basePath, "Last update" moves
-  forward with new readings, batched recompute-all (6.4 s → 0.4 s), audit RecordId length, import keeps install date,
-  files removed with their machine/standard, maintenance order, collation note in admin handoff

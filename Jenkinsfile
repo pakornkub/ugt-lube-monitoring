@@ -9,8 +9,8 @@
 //   UGT Reliability Lube Monitoring  human-readable name
 //   /ugt-lube-monitoring        e.g. /my-app        (omit / adapt if no basePath)
 //   /ugt-lube-monitoring-dev         e.g. /my-app-dev
-//   https://CHANGE_ME_APP_HOST/ugt-lube-monitoring          e.g. https://apps.example.com/my-app
-//   https://CHANGE_ME_APP_HOST/ugt-lube-monitoring-dev           e.g. https://apps.example.com/my-app-dev
+//   https://ugtweb.ube.co.th/ugt-lube-monitoring          e.g. https://apps.example.com/my-app
+//   https://ugtweb.ube.co.th/ugt-lube-monitoring-dev           e.g. https://apps.example.com/my-app-dev
 //
 // Sections marked [DB] are OPTIONAL — delete them if the project has no
 // database / Prisma migrations.
@@ -214,7 +214,8 @@ pipeline {
                     // are baked into the bundle at compile time → MUST be build args,
                     // never runtime environment
                     def basePath  = isProd ? '/ugt-lube-monitoring' : '/ugt-lube-monitoring-dev'
-                    def appUrl    = isProd ? 'https://CHANGE_ME_APP_HOST/ugt-lube-monitoring'   : 'https://CHANGE_ME_APP_HOST/ugt-lube-monitoring-dev'
+                    def appUrl    = isProd ? 'https://ugtweb.ube.co.th/ugt-lube-monitoring'   : 'https://ugtweb.ube.co.th/ugt-lube-monitoring-dev'
+                    def appName   = isProd ? env.NEXT_PUBLIC_APP_NAME : "${env.NEXT_PUBLIC_APP_NAME} (DEV)"
                     def imageName = isProd ? 'ugt-lube-monitoring'   : 'ugt-lube-monitoring-dev'
                     def buildNum  = env.BUILD_NUMBER
                     // deploymentId: build number + commit — BUILD_NUMBER alone restarts at 1 when the
@@ -234,7 +235,7 @@ pipeline {
                             --target builder \\
                             --build-arg NEXT_PUBLIC_BASE_PATH=${basePath} \\
                             --build-arg NEXT_PUBLIC_APP_URL=${appUrl} \\
-                            --build-arg NEXT_PUBLIC_APP_NAME="${env.NEXT_PUBLIC_APP_NAME}" \\
+                            --build-arg NEXT_PUBLIC_APP_NAME="${appName}" \\
                             --build-arg NEXT_DEPLOYMENT_ID=${deployId} \\
                             -t ${imageName}:${buildNum}-builder \\
                             .
@@ -242,7 +243,7 @@ pipeline {
                             --network host \\
                             --build-arg NEXT_PUBLIC_BASE_PATH=${basePath} \\
                             --build-arg NEXT_PUBLIC_APP_URL=${appUrl} \\
-                            --build-arg NEXT_PUBLIC_APP_NAME="${env.NEXT_PUBLIC_APP_NAME}" \\
+                            --build-arg NEXT_PUBLIC_APP_NAME="${appName}" \\
                             --build-arg NEXT_DEPLOYMENT_ID=${deployId} \\
                             -t ${imageName}:latest \\
                             -t ${imageName}:${buildNum} \\
