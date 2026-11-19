@@ -1,33 +1,33 @@
-import { createClient } from "@/lib/supabase/server";
-import { checkHasPermission } from "@/lib/queries/permissions";
-import type { ActionResult } from "./result";
+import { getOwnPermissions, getSessionUser } from '@/lib/profile';
+import { canAccessAsset } from '@/lib/queries/permissions';
+import type { ActionResult } from './result';
 
-// The admin (service-role) client bypasses RLS, so any server action using it
-// must FIRST verify the caller's permission through the user-session client.
-// Returns the caller's user id on success (used e.g. to prevent self-delete).
+// Every Server Action with a side effect checks, in order: session → permission →
+// (plant scope) → action → audit log. Returns the caller's user id on success
+// (used e.g. as CreatedBy/UpdatedBy and to prevent self-delete).
 
 export type GuardResult = { ok: true; userId: string } | { ok: false; error: ActionResult };
 
-// Permission check for actions that must not be open to every logged-in user.
-// (AUD-019) Always gate server actions that have side effects (e.g. sending
-// emails) even when they don't use the service-role client.
-//
-// `perm` is one of the keys seeded into the `permissions` table by
-// supabase/0023_dynamic_rbac.sql (e.g. "assets:write", "reports:view"). This
-// calls the SAME `has_permission()` Postgres function that RLS policies call,
-// so which roles can do what is defined ONCE (in the `role_permissions` table)
-// instead of being duplicated between this file and every RLS policy.
+// `perm` is a key from lib/permissions.ts (e.g. "assets:write"). Always the user's
+// OWN grants — "view as" never widens or narrows what an action may do.
 export async function requirePermission(perm: string): Promise<GuardResult> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) {
-    return { ok: false, error: { ok: false, message: "Unauthorized: กรุณาเข้าสู่ระบบ" } };
+    return { ok: false, error: { ok: false, message: 'Unauthorized: กรุณาเข้าสู่ระบบ' } };
   }
-  const allowed = await checkHasPermission(supabase, perm);
-  if (!allowed) {
+  if (!(await getOwnPermissions(user.id)).includes(perm)) {
     return { ok: false, error: { ok: false, message: `ไม่มีสิทธิ์ดำเนินการนี้ (${perm})` } };
   }
   return { ok: true, userId: user.id };
+}
+
+// requirePermission + the machine's plant must be in the user's site scope
+// (what the Supabase RLS policies enforced with can_access_site()).
+export async function requireAssetPermission(perm: string, assetId: string): Promise<GuardResult> {
+  const g = await requirePermission(perm);
+  if (!g.ok) return g;
+  if (!(await canAccessAsset(assetId))) {
+    return { ok: false, error: { ok: false, message: 'ไม่พบเครื่องจักร หรือไม่มีสิทธิ์เข้าถึงโรงงานนี้' } };
+  }
+  return g;
 }

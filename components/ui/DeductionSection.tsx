@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import type { DeductionItem } from "@/lib/scoring/audit";
+import type { ReactNode } from 'react';
+import type { DeductionItem } from '@/lib/scoring/audit';
 
 // One category (oil or vib) of a health-score deduction breakdown — shared by
 // the Drill-down Health tab and the Alarm Config live audit preview so both
@@ -21,12 +21,17 @@ export function DeductionSection({
   return (
     <div className="border-b border-border py-2">
       <div className="mb-1 flex items-center justify-between text-[13px] font-bold text-t3">
-        <span className="inline-flex items-center gap-1.5">{title} (Weight {weight}%)</span>
+        <span className="inline-flex items-center gap-1.5">
+          {title} (Weight {weight}%)
+        </span>
         <span className="font-mono text-t1">{score}/100</span>
       </div>
       {items.length ? (
         items.map((it, i) => (
-          <div key={i} className="flex items-center justify-between border-b border-dashed border-black/5 py-1">
+          <div
+            key={i}
+            className="flex items-center justify-between border-b border-dashed border-black/5 py-1"
+          >
             <div>
               <div className="text-[14px] font-semibold text-red">{it.name}</div>
               <div className="text-[13px] text-t3">{it.reason}</div>
@@ -40,7 +45,7 @@ export function DeductionSection({
           </div>
         ))
       ) : (
-        <div className="py-1 text-[13px] italic text-t3">{emptyLabel}</div>
+        <div className="py-1 text-[13px] text-t3 italic">{emptyLabel}</div>
       )}
     </div>
   );

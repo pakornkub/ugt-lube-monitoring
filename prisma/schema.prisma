@@ -1,0 +1,493 @@
+// ─── Naming Convention ───────────────────────────────────────────────────────
+// Tables: PascalCase plural via @@map(). Columns: PascalCase via @map().
+// EXCEPTION: the auth/RBAC tables (ugt-nextjs-auth-setup) map SINGULAR as a set —
+// User, Session, Account, Verification, RateLimit, Role, Permission, RolePermission
+// (ActivityLogs is the one plural in that set).
+//
+// ⚠ deviation: domain models keep snake_case FIELD names (asset_id, vg_grade, …).
+// The app's row contracts (lib/types.ts) were written against the Supabase
+// schema in that shape, and every page/component reads them; matching the field
+// names keeps those contracts unchanged. DB column names are still PascalCase.
+// Lists (site_access, tags, …) are JSON arrays in NVarChar(Max) — SQL Server has
+// no array type; lib/db/json.ts reads/writes them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  // Org choice: every kit asset imports from "@prisma/client".
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver" // NO url here — the url lives only in prisma.config.ts
+}
+
+// ─── Reference data ──────────────────────────────────────────────────────────
+
+model site {
+  code       String   @id @db.NVarChar(20)           @map("Code")
+  name       String   @db.NVarChar(200)              @map("Name")
+  sort_order Int      @default(0)                    @map("SortOrder") // ORDER is reserved
+  created_at DateTime @default(now())                @map("CreatedAt")
+  updated_at DateTime @updatedAt                     @map("UpdatedAt")
+  created_by String   @default("system") @db.NVarChar(200) @map("CreatedBy")
+  updated_by String?  @db.NVarChar(200)              @map("UpdatedBy")
+
+  assets asset[]
+
+  @@map("Sites")
+}
+
+model assetType {
+  name       String   @id @db.NVarChar(100)          @map("TypeName")
+  abbr       String?  @db.NVarChar(20)               @map("Abbr")
+  color      String?  @db.NVarChar(20)               @map("Color")
+  created_at DateTime @default(now())                @map("CreatedAt")
+  updated_at DateTime @updatedAt                     @map("UpdatedAt")
+  created_by String   @default("system") @db.NVarChar(200) @map("CreatedBy")
+  updated_by String?  @db.NVarChar(200)              @map("UpdatedBy")
+
+  assets asset[]
+
+  @@map("AssetTypes")
+}
+
+// ─── Machines ────────────────────────────────────────────────────────────────
+
+model asset {
+  id                String    @id @db.NVarChar(50)           @map("Id")
+  name              String    @db.NVarChar(300)              @map("Name")
+  type              String    @db.NVarChar(100)              @map("AssetType")
+  site              String    @db.NVarChar(20)               @map("SiteCode")
+  /// Health Score cache (0–100) — written ONLY by lib/scoring/recompute.ts.
+  health            Int       @default(100)                  @map("Health")
+  /// Healthy | Warning | Critical — derived together with health.
+  status            String    @default("Healthy") @db.NVarChar(20) @map("Status")
+  install_date      DateTime? @db.Date                       @map("InstallDate")
+  motor_kw          Float?                                   @map("MotorKw")
+  rpm               Float?                                   @map("Rpm")
+  /// ISO VG grade; 0 = no VG (e.g. SAE grade) → generic visc limits.
+  vg_grade          Int       @default(46)                   @map("VgGrade")
+  oil_brand         String?   @db.NVarChar(200)              @map("OilBrand")
+  oil_qty_l         Float     @default(20)                   @map("OilQtyL")
+  oil_change_months Int       @default(6)                    @map("OilChangeMonths")
+  oil_sample_months Int       @default(3)                    @map("OilSampleMonths")
+  /// 'YYYY-MM' of the latest reading.
+  last_update       String?   @db.NVarChar(7)                @map("LastUpdate")
+  created_at        DateTime  @default(now())                @map("CreatedAt")
+  updated_at        DateTime  @updatedAt                     @map("UpdatedAt")
+  created_by        String    @default("system") @db.NVarChar(200) @map("CreatedBy")
+  updated_by        String?   @db.NVarChar(200)              @map("UpdatedBy")
+
+  assetType       assetType            @relation(fields: [type], references: [name], onUpdate: NoAction)
+  siteRef         site                 @relation(fields: [site], references: [code], onUpdate: NoAction)
+  oil_readings    oilReading[]
+  vib_readings    vibReading[]
+  maintenance     maintenanceRecord[]
+  alarmOverrides  assetAlarmOverride[]
+  scoreOverride   assetScoreOverride?
+  attachments     readingAttachment[]
+
+  @@index([site])
+  @@index([status])
+  @@map("Assets")
+}
+
+model oilReading {
+  id          String   @id @default(uuid()) @db.NVarChar(36) @map("Id")
+  asset_id    String   @db.NVarChar(50)               @map("AssetId")
+  /// 'YYYY-MM'
+  period      String   @db.NVarChar(7)                @map("Period")
+  fe          Float?                                  @map("Fe")
+  cu          Float?                                  @map("Cu") // no longer entered or scored (kept)
+  si          Float?                                  @map("Si") // no longer entered or scored (kept)
+  water       Float?                                  @map("Water")
+  visc        Float?                                  @map("Visc")
+  tan         Float?                                  @map("Tan")
+  iso_code    String?  @db.NVarChar(20)               @map("IsoCode")
+  particle_4  Int?                                    @map("Particle4")
+  particle_6  Int?                                    @map("Particle6")
+  particle_14 Int?                                    @map("Particle14")
+  created_at  DateTime @default(now())                @map("CreatedAt")
+  updated_at  DateTime @updatedAt                     @map("UpdatedAt")
+  created_by  String   @default("system") @db.NVarChar(200) @map("CreatedBy")
+  updated_by  String?  @db.NVarChar(200)              @map("UpdatedBy")
+
+  asset asset @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([asset_id, period])
+  @@map("OilReadings")
+}
+
+model vibReading {
+  id         String   @id @default(uuid()) @db.NVarChar(36) @map("Id")
+  asset_id   String   @db.NVarChar(50)                @map("AssetId")
+  period     String   @db.NVarChar(7)                 @map("Period")
+  vel        Float?                                   @map("Vel")
+  acc        Float?                                   @map("Acc")
+  cf         Float?                                   @map("Cf")
+  temp       Float?                                   @map("Temp")
+  created_at DateTime @default(now())                 @map("CreatedAt")
+  updated_at DateTime @updatedAt                      @map("UpdatedAt")
+  created_by String   @default("system") @db.NVarChar(200) @map("CreatedBy")
+  updated_by String?  @db.NVarChar(200)               @map("UpdatedBy")
+
+  asset asset @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([asset_id, period])
+  @@map("VibReadings")
+}
+
+model maintenanceRecord {
+  id          String    @id @default(uuid()) @db.NVarChar(36) @map("Id")
+  asset_id    String    @db.NVarChar(50)              @map("AssetId")
+  /// 'pm' | 'cm'
+  type        String    @db.NVarChar(10)              @map("RecordType")
+  work_date   DateTime? @db.Date                      @map("WorkDate")
+  wo_no       String?   @db.NVarChar(50)              @map("WoNo")
+  description String?   @db.NVarChar(Max)             @map("Description")
+  parts       String?   @db.NVarChar(Max)             @map("Parts")
+  cost        Float     @default(0)                   @map("Cost")
+  technician  String?   @db.NVarChar(200)             @map("Technician")
+  created_at  DateTime  @default(now())               @map("CreatedAt")
+  updated_at  DateTime  @updatedAt                    @map("UpdatedAt")
+  created_by  String    @default("system") @db.NVarChar(200) @map("CreatedBy")
+  updated_by  String?   @db.NVarChar(200)             @map("UpdatedBy")
+
+  asset asset @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([asset_id])
+  @@map("MaintenanceRecords")
+}
+
+// ─── Scoring configuration ───────────────────────────────────────────────────
+
+model alarmParam {
+  id           String   @id @default(uuid()) @db.NVarChar(36) @map("Id")
+  /// 'oil' | 'vib'
+  category     String   @db.NVarChar(10)              @map("Category")
+  key          String   @db.NVarChar(30)              @map("ParamKey") // KEY is reserved
+  name         String   @db.NVarChar(200)             @map("Name")
+  unit         String?  @db.NVarChar(50)              @map("Unit")
+  description  String?  @db.NVarChar(Max)            @map("Description")
+  warn_limit   Float?                                 @map("WarnLimit")
+  crit_limit   Float?                                 @map("CritLimit")
+  warn_penalty Float?                                 @map("WarnPenalty")
+  crit_penalty Float?                                 @map("CritPenalty")
+  updated_at   DateTime @default(now()) @updatedAt    @map("UpdatedAt")
+  updated_by   String?  @db.NVarChar(200)             @map("UpdatedBy")
+
+  @@unique([category, key])
+  @@map("AlarmParams")
+}
+
+model scoreConfig {
+  id           Int      @id @default(1)               @map("Id")
+  oil_weight   Float    @default(100)                 @map("OilWeight")
+  vib_weight   Float    @default(0)                   @map("VibWeight")
+  warn_penalty Float    @default(15)                  @map("WarnPenalty")
+  crit_penalty Float    @default(30)                  @map("CritPenalty")
+  updated_at   DateTime @default(now()) @updatedAt    @map("UpdatedAt")
+  updated_by   String?  @db.NVarChar(200)             @map("UpdatedBy")
+
+  @@map("ScoreConfigs")
+}
+
+model assetAlarmOverride {
+  id           String  @id @default(uuid()) @db.NVarChar(36) @map("Id")
+  asset_id     String  @db.NVarChar(50)               @map("AssetId")
+  category     String  @db.NVarChar(10)               @map("Category")
+  key          String  @db.NVarChar(30)               @map("ParamKey")
+  warn_limit   Float?                                 @map("WarnLimit")
+  crit_limit   Float?                                 @map("CritLimit")
+  warn_penalty Float?                                 @map("WarnPenalty")
+  crit_penalty Float?                                 @map("CritPenalty")
+
+  asset asset @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([asset_id, category, key])
+  @@map("AssetAlarmOverrides")
+}
+
+model assetScoreOverride {
+  asset_id     String @id @db.NVarChar(50)            @map("AssetId")
+  oil_weight   Float?                                 @map("OilWeight")
+  vib_weight   Float?                                 @map("VibWeight")
+  warn_penalty Float?                                 @map("WarnPenalty")
+  crit_penalty Float?                                 @map("CritPenalty")
+
+  asset asset @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("AssetScoreOverrides")
+}
+
+// ─── Standards library ───────────────────────────────────────────────────────
+
+model standard {
+  id                   String   @id @default(uuid()) @db.NVarChar(36) @map("Id")
+  /// TRIBOLOGY | VIBRATION | RELIABILITY | ASSET | CUSTOM
+  category             String   @db.NVarChar(20)      @map("Category")
+  title                String   @db.NVarChar(300)     @map("Title")
+  subtitle             String?  @db.NVarChar(500)     @map("Subtitle")
+  description          String?  @db.NVarChar(Max)     @map("Description")
+  full_text            String?  @db.NVarChar(Max)     @map("FullText")
+  /// JSON string[]
+  tags                 String   @default("[]") @db.NVarChar(Max) @map("Tags")
+  version              Int      @default(1)           @map("Version")
+  /// JSON string[] of alarm param keys
+  related_params       String   @default("[]") @db.NVarChar(Max) @map("RelatedParams")
+  /// JSON string[] of asset type names
+  asset_types          String   @default("[]") @db.NVarChar(Max) @map("AssetTypes")
+  /// JSON string[] of standard ids
+  related_standard_ids String   @default("[]") @db.NVarChar(Max) @map("RelatedStandardIds")
+  created_at           DateTime @default(now())       @map("CreatedAt")
+  updated_at           DateTime @default(now()) @updatedAt @map("UpdatedAt")
+  created_by           String   @default("system") @db.NVarChar(200) @map("CreatedBy")
+  updated_by           String?  @db.NVarChar(200)     @map("UpdatedBy")
+
+  attachments standardAttachment[]
+
+  @@map("Standards")
+}
+
+// ─── Attachments (files on the Docker volume, lib/storage.ts) ────────────────
+// Linked by a real FK per owning type (machine reading / standard) — decision in
+// docs/project-context/decisions.md. Delete = soft delete; the bytes are removed by
+// the retention sweep (app/api/cron/attachments-sweep) after 90 days.
+
+model readingAttachment {
+  id           String    @id @default(uuid()) @db.NVarChar(36) @map("Id")
+  asset_id     String    @db.NVarChar(50)             @map("AssetId")
+  /// 'YYYY-MM' (null = machine-level file)
+  period       String?   @db.NVarChar(7)              @map("Period")
+  /// 'oil' | 'vib'
+  kind         String?   @db.NVarChar(10)             @map("Kind")
+  file_name    String    @db.NVarChar(255)            @map("FileName")
+  /// Generated path on the volume — never user input.
+  storage_path String    @unique @db.NVarChar(300)    @map("StorageKey")
+  mime_type    String?   @db.NVarChar(150)            @map("ContentType")
+  size_bytes   Int?                                   @map("FileSize")
+  checksum     String?   @db.NVarChar(64)             @map("Checksum")
+  uploaded_by  String?   @db.NVarChar(200)            @map("CreatedBy")
+  created_at   DateTime  @default(now())              @map("CreatedAt")
+  updated_at   DateTime  @default(now()) @updatedAt   @map("UpdatedAt")
+  updated_by   String?   @db.NVarChar(200)            @map("UpdatedBy")
+  is_active    Boolean   @default(true)               @map("IsActive")
+  is_deleted   Boolean   @default(false)              @map("IsDeleted")
+
+  asset asset @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([asset_id, period])
+  @@map("ReadingAttachments")
+}
+
+model standardAttachment {
+  id           String   @id @default(uuid()) @db.NVarChar(36) @map("Id")
+  standard_id  String   @db.NVarChar(36)              @map("StandardId")
+  file_name    String   @db.NVarChar(255)             @map("FileName")
+  storage_path String   @unique @db.NVarChar(300)     @map("StorageKey")
+  mime_type    String?  @db.NVarChar(150)             @map("ContentType")
+  size_bytes   Int?                                   @map("FileSize")
+  checksum     String?  @db.NVarChar(64)              @map("Checksum")
+  uploaded_by  String?  @db.NVarChar(200)             @map("CreatedBy")
+  created_at   DateTime @default(now())               @map("CreatedAt")
+  updated_at   DateTime @default(now()) @updatedAt    @map("UpdatedAt")
+  updated_by   String?  @db.NVarChar(200)             @map("UpdatedBy")
+  is_active    Boolean  @default(true)                @map("IsActive")
+  is_deleted   Boolean  @default(false)               @map("IsDeleted")
+
+  standard standard @relation(fields: [standard_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([standard_id])
+  @@map("StandardAttachments")
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+model notificationConfig {
+  id                     Int      @id @default(1)     @map("Id")
+  /// Unused since the SMTP relay move — mail always leaves as SMTP_FROM (ADR 0006). Kept to avoid a drop migration.
+  from_email            String   @default("alerts@ugt-reliability.com") @db.NVarChar(255) @map("FromEmail")
+  /// JSON string[]
+  email_recipients       String   @default("[]") @db.NVarChar(Max) @map("EmailRecipients")
+  enable_critical_alerts Boolean  @default(true)      @map("EnableCriticalAlerts")
+  enable_weekly_summary  Boolean  @default(false)     @map("EnableWeeklySummary")
+  updated_at             DateTime @default(now()) @updatedAt @map("UpdatedAt")
+  updated_by             String?  @db.NVarChar(200)   @map("UpdatedBy")
+
+  @@map("NotificationConfigs")
+}
+
+// ─── Admin-editable settings (ugt-nextjs-mail-setup) ──────────────────────────
+// Key/value store; mail templates live here under `mailTemplate:<key>`. Settings
+// table — trimmed audit set on purpose (contract allows it), who/when kept.
+
+model appSetting {
+  id        String   @id @default(cuid())            @map("Id")
+  key       String   @unique @db.NVarChar(200)       @map("SettingKey")   // KEY is reserved
+  value     String   @db.NVarChar(Max)               @map("SettingValue")
+  createdAt DateTime @default(now())                 @map("CreatedAt")
+  updatedAt DateTime @updatedAt                      @map("UpdatedAt")
+  updatedBy String?  @db.NVarChar(200)               @map("UpdatedBy")
+
+  @@map("AppSettings")
+}
+
+// ─── Better Auth core (ugt-nextjs-auth-setup) ────────────────────────────────
+
+model user {
+  id            String    @id @default(cuid())              @map("Id")
+  name          String                                       @map("Name")
+  email         String    @unique                            @map("Email")
+  emailVerified Boolean   @default(false)                    @map("EmailVerified")
+  image         String?   @db.NVarChar(Max)                  @map("Image")
+  createdAt     DateTime  @default(now())                    @map("CreatedAt")
+  updatedAt     DateTime  @updatedAt                         @map("UpdatedAt")
+
+  // Auth — last login method: "sso" | "ldap" | "local"
+  authType     String  @default("local") @map("AuthType")
+
+  // RBAC — each user has at most one role
+  roleId       String?                                       @map("RoleId")
+  userRole     role?    @relation(fields: [roleId], references: [id])
+
+  // Directory username (preferred_username) — links SSO logins back to the AD identity.
+  // MSSQL: unique on a nullable column allows ONE NULL — the init migration swaps it
+  // for a filtered index (schema-and-env.md §SQL Server).
+  ldapUsername String?  @unique                              @map("LdapUsername")
+
+  // EXTENSION POINT: project fields
+  /// JSON string[] of plant codes this user may see; [] = every plant.
+  siteAccess   String   @default("[]") @db.NVarChar(Max)     @map("SiteAccess")
+
+  /// When admins were mailed "logged in without a role" — once per user (lib/after-login.ts)
+  noRoleNotifiedAt DateTime?                                   @map("NoRoleNotifiedAt")
+
+  @@index([roleId])
+
+  sessions session[]
+  accounts account[]
+
+  @@map("User")
+}
+
+model session {
+  id        String   @id @default(cuid()) @map("Id")
+  expiresAt DateTime                       @map("ExpiresAt")
+  token     String   @unique              @map("Token")
+  createdAt DateTime @default(now())      @map("CreatedAt")
+  updatedAt DateTime @updatedAt           @map("UpdatedAt")
+  ipAddress String?                        @map("IpAddress")
+  userAgent String?  @db.NVarChar(Max)    @map("UserAgent")
+  userId    String                         @map("UserId")
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("Session")
+}
+
+model account {
+  id                    String    @id @default(cuid())  @map("Id")
+  accountId             String                           @map("AccountId")
+  providerId            String                           @map("ProviderId")
+  userId                String                           @map("UserId")
+  user                  user      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @db.NVarChar(Max)     @map("AccessToken")
+  refreshToken          String?   @db.NVarChar(Max)     @map("RefreshToken")
+  idToken               String?   @db.NVarChar(Max)     @map("IdToken")
+  accessTokenExpiresAt  DateTime?                        @map("AccessTokenExpiresAt")
+  refreshTokenExpiresAt DateTime?                        @map("RefreshTokenExpiresAt")
+  scope                 String?                          @map("Scope")
+  password              String?   @db.NVarChar(Max)     @map("Password")
+  createdAt             DateTime  @default(now())        @map("CreatedAt")
+  updatedAt             DateTime  @updatedAt             @map("UpdatedAt")
+
+  @@unique([providerId, accountId])
+  @@map("Account")
+}
+
+model verification {
+  id         String    @id @default(cuid()) @map("Id")
+  identifier String                          @map("Identifier")
+  value      String    @db.NVarChar(Max)    @map("VerificationValue")
+  expiresAt  DateTime                        @map("ExpiresAt")
+  createdAt  DateTime? @default(now())       @map("CreatedAt")
+  updatedAt  DateTime? @updatedAt            @map("UpdatedAt")
+
+  @@map("Verification")
+}
+
+// ─── RBAC ────────────────────────────────────────────────────────────────────
+// user (1) ── (0..1) role (1) ── (M) rolePermission (M) ── (1) permission
+// Role ids are the old slugs ('admin', 'engineer', …) so the "view as" cookie and
+// role-based menus keep working; /admin/setup creates the 'admin' role.
+
+model role {
+  id          String   @id @default(cuid()) @map("Id")
+  /// Display label, e.g. 'วิศวกร (Engineer)'
+  name        String   @unique              @map("Name")
+  description String?  @db.NVarChar(Max)   @map("Description")
+  isSystem    Boolean  @default(false)      @map("IsSystem")  // system roles cannot be deleted
+  /// JSON string[] — sidebar "งานของฉัน" links in order; null = the original sidebar. View only.
+  menuMain    String?  @db.NVarChar(Max)   @map("MenuMain")
+  createdAt   DateTime @default(now())      @map("CreatedAt")
+  updatedAt   DateTime @updatedAt           @map("UpdatedAt")
+
+  users       user[]
+  permissions rolePermission[]
+
+  @@map("Role")
+}
+
+model permission {
+  id    String @id @default(cuid()) @map("Id")
+  key   String @unique              @map("PermKey")   // KEY is T-SQL reserved
+  label String                      @map("Label")
+  group String                      @map("GroupName") // GROUP is T-SQL reserved
+
+  roles rolePermission[]
+
+  @@map("Permission")
+}
+
+model rolePermission {
+  roleId       String @map("RoleId")
+  permissionId String @map("PermissionId")
+
+  role         role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("RolePermission")
+}
+
+// ─── Rate Limiting (Better Auth, rateLimit.storage = "database") ─────────────
+
+model rateLimit {
+  id          String  @id          @map("Id")
+  key         String?              @map("BucketKey")    // KEY is T-SQL reserved
+  count       Int                  @map("RequestCount") // COUNT is a T-SQL aggregate function
+  lastRequest BigInt               @map("LastRequest")
+
+  @@map("RateLimit")
+}
+
+// ─── Audit Log ───────────────────────────────────────────────────────────────
+// Auth events (login/logout) + every privileged mutation. EXTENSION: the domain
+// columns (TableName/RecordId/OldValue/NewValue) carry the old audit_log trail
+// that /admin/audit shows.
+
+model activityLog {
+  id        Int      @id @default(autoincrement()) @map("Id")
+  userId    String   @map("UserId")
+  action    String   @map("Action")
+  detail    String?  @db.NVarChar(Max) @map("Detail")
+  tableName String?  @db.NVarChar(100) @map("TableName")
+  recordId  String?  @db.NVarChar(200) @map("RecordId")
+  oldValue  String?  @db.NVarChar(Max) @map("OldValue")
+  newValue  String?  @db.NVarChar(Max) @map("NewValue")
+  createdAt DateTime @default(now()) @map("CreatedAt")
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([userId])
+  @@map("ActivityLogs")
+}

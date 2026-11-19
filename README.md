@@ -1,73 +1,54 @@
 # UGT Reliability Lube Monitoring
 
-Condition-monitoring and reliability platform for industrial lubrication and vibration analysis — asset health scoring, oil/vibration readings, PM/work-order management, AI-assisted diagnostics, and executive reporting.
+Condition-monitoring and reliability platform for industrial lubrication and vibration analysis — machine
+health scoring, oil/vibration readings, lab Excel import, AI-assisted diagnostics, standards library and
+executive reporting.
 
-Built with Next.js 14 (App Router) + TypeScript + Tailwind + Supabase (Postgres/Auth/Storage).
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 + shadcn (base-mira) · Prisma 7 → SQL Server ·
+Better Auth (Keycloak SSO) · Jenkins + Docker + SonarQube.
 
-> Looking for the full product spec, module list, and design tokens? See [`PRD.md`](PRD.md). Looking for agent/AI-assistant working conventions (iron rules, source-of-truth order)? See [`AGENTS.md`](AGENTS.md).
+> Product spec, modules and scoring formula: [`PRD.md`](PRD.md) · agent working rules: [`AGENTS.md`](AGENTS.md) ·
+> design agreement: [`docs/DESIGN.md`](docs/DESIGN.md) · system map: [`docs/project-context/`](docs/project-context/00-index.md) ·
+> server setup request: [`docs/admin-handoff.md`](docs/admin-handoff.md)
 
 ## Prerequisites
 
-- Node.js 20+
-- A Supabase project ([supabase.com](https://supabase.com)) — or skip this and run in **Demo Mode** (see below)
+- Node.js 22
+- A SQL Server database (dev) and a Keycloak client — see `docs/admin-handoff.md`
 
-## Quick start (Demo Mode — no Supabase needed)
-
-Demo Mode previews every module with realistic sample data; writes are accepted in the UI but not persisted.
+## Local setup
 
 ```bash
 npm install
+cp .env.example .env.local      # fill DATABASE_URL, BETTER_AUTH_*, KEYCLOAK_*, (SMTP_*, CRON_SECRET)
+npx prisma migrate deploy        # creates the tables (prisma/migrations)
+npx prisma db seed               # 569 machines + plants, types, thresholds, standards
 npm run dev
 ```
 
-Demo Mode activates automatically whenever Supabase env vars aren't set. Open http://localhost:3000.
-
-## Full setup (real Supabase backend)
-
-1. Copy the env template and fill in your Supabase project's values:
-   ```bash
-   cp .env.example .env.local
-   ```
-   Required vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server-only — never expose this one to the client). `AI_API_KEY` is optional — without it, AI features fall back to rule-based logic.
-
-2. In the Supabase SQL Editor, run every file in `supabase/` **in numeric order** (each depends on the ones before it):
-   ```
-   0001_schema.sql   → tables, RLS, compute_health(), triggers, auto-profile
-   0002_seed.sql     → reference data + alarm defaults + 5 standards
-   0003_attachments.sql
-   0007_particle.sql … 0033_latest_oil_view.sql   (0004–0006, 0018, 0019 were removed)
-                       0032_real_equipment.sql loads the 569 real machines
-   ```
-   Do not change seed thresholds/alarm defaults without also updating `PRD.md` §5.5 — they must stay identical (single source of truth for health scoring).
-
-3. Sign up through the app's `/signup` page, then promote your own account to `admin` directly in Supabase (`profiles` table, `role` column) — the first user isn't auto-promoted.
-
-4. Set `DEMO_MODE=false` in `.env.local` (or just remove it — Demo Mode auto-disables once real Supabase values are present).
-
-5. Run the dev server:
-   ```bash
-   npm run dev
-   ```
+Log in with SSO. The **first** person to log in is sent to `/admin/setup` and becomes Administrator with one
+click (it also creates the Engineer / Manager / Viewer roles). Everyone else gets a role from Admin → Users.
 
 ## Scripts
 
 | Command | Purpose |
-|---|---|
-| `npm run dev` | Start the dev server |
-| `npm run build` | Production build |
-| `npm run start` | Run a production build |
+| --- | --- |
+| `npm run dev` / `build` / `start` | Develop / production build / run the build |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run lint` | `next lint` |
-| `npm run test` | Run the Vitest suite |
+| `npm run lint` · `npm run format:check` | ESLint · Prettier (the pipeline calls these names) |
+| `npm test` · `npm run test:coverage` | Vitest (JUnit + lcov when `CI=true`) |
 
-Pre-commit order: `typecheck` → `lint` → `test` → `build` (all four run automatically on push/PR via `.github/workflows/ci.yml`).
+Pre-commit (husky + lint-staged) formats and lints staged files.
 
-## Deploying (Vercel)
+## Deploying
 
-1. Import the repo into Vercel.
-2. Set the same env vars from `.env.local` in the Vercel project settings (Production + Preview).
-3. Deploy — `next build` runs automatically.
+Push `develop` (dev, `/ugt-lube-monitoring-dev`) or `main` (prod, `/ugt-lube-monitoring`) — Jenkins runs
+lint/format/typecheck → tests → build → OWASP → SonarQube Quality Gate → Docker build → migrate → deploy
+(`Jenkinsfile`, `Dockerfile`, `docker-compose*.yml`). Attachments live on the bind mount
+`/home/docker02/appdata/<project>/storage`. Scheduled jobs (weekly digest, attachment sweep) run in the `cron` service of `docker-compose.yml` (alpine + busybox crond).
 
 ## Health Score — read before touching scoring code
 
-Health score is computed **only** server-side by `compute_health()` (`supabase/0001_schema.sql`) and cached on `assets.health`/`assets.status` via triggers. Every page reads that cached value — never recompute it client-side. See `AGENTS.md` for the full rule and `PRD.md` §6 for the formula.
+One formula, computed server-side only: `lib/scoring/audit.ts`, written to `Assets.Health/Status` by
+`lib/scoring/recompute.ts` after every write that can change a score. Every page reads that cached value —
+never recompute it client-side. See `AGENTS.md` and `PRD.md` §6.

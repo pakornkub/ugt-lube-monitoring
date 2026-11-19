@@ -1,6 +1,6 @@
 // Domain types mirroring supabase/0001_schema.sql.
 // NOTE: Health/Status are DERIVED server-side (compute_health) and cached on `assets`.
-export type AssetStatus = "Healthy" | "Warning" | "Critical";
+export type AssetStatus = 'Healthy' | 'Warning' | 'Critical';
 // Roles are DYNAMIC (supabase/0023_dynamic_rbac.sql's `roles` table) — an admin
 // can create new roles through the app, so this can no longer be a fixed
 // literal union. What a role can actually DO is resolved via has_permission(),
@@ -10,6 +10,7 @@ export type UserRole = string;
 export interface Profile {
   id: string;
   full_name: string | null;
+  email?: string;
   /** The role the app renders as — the previewed one while an admin uses "view as". */
   role: UserRole;
   /** Set while previewing: the user's own role (Demo Mode's user is always admin). */
@@ -34,7 +35,6 @@ export interface Permission {
 
 export interface NotificationConfig {
   id: number;
-  from_email: string;
   email_recipients: string[];
   enable_critical_alerts: boolean;
   enable_weekly_summary: boolean;
@@ -94,7 +94,7 @@ export interface VibReading {
 
 export interface AlarmParam {
   id: string;
-  category: "oil" | "vib";
+  category: 'oil' | 'vib';
   key: string;
   name: string;
   unit: string | null;
@@ -117,7 +117,7 @@ export interface ScoreConfig {
 export interface AssetAlarmOverride {
   id: string;
   asset_id: string;
-  category: "oil" | "vib";
+  category: 'oil' | 'vib';
   key: string;
   warn_limit: number | null;
   crit_limit: number | null;
@@ -137,7 +137,7 @@ export interface AssetScoreOverride {
 export interface MaintenanceRecord {
   id: string;
   asset_id: string;
-  type: "pm" | "cm";
+  type: 'pm' | 'cm';
   work_date: string | null;
   wo_no: string | null;
   description: string | null;
@@ -146,12 +146,7 @@ export interface MaintenanceRecord {
   technician: string | null;
 }
 
-export type StandardCategory =
-  | "TRIBOLOGY"
-  | "VIBRATION"
-  | "RELIABILITY"
-  | "ASSET"
-  | "CUSTOM";
+export type StandardCategory = 'TRIBOLOGY' | 'VIBRATION' | 'RELIABILITY' | 'ASSET' | 'CUSTOM';
 
 export interface Standard {
   id: string;
@@ -164,6 +159,8 @@ export interface Standard {
   version: number | null;
   updated_at: string | null;
   updated_by: string | null;
+  /** Name (or email) of updated_by — the id itself when that user no longer exists. */
+  updated_by_name?: string | null;
   /** Alarm param keys this standard applies to (e.g. ["vel", "acc"]). */
   related_params: string[] | null;
   /** Asset types this standard applies to (e.g. ["Pump", "Gearbox"]). */
@@ -176,7 +173,7 @@ export interface ReadingAttachment {
   id: string;
   asset_id: string;
   period: string | null;
-  kind: "oil" | "vib" | null;
+  kind: 'oil' | 'vib' | null;
   file_name: string;
   storage_path: string;
   mime_type: string | null;
@@ -193,4 +190,3 @@ export interface StandardAttachment {
   size_bytes: number | null;
   created_at: string;
 }
-

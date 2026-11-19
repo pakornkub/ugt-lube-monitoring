@@ -1,20 +1,23 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/env";
-import type { NotificationConfig } from "@/lib/types";
+import { prisma } from '@/lib/prisma';
+import { parseList } from '@/lib/db/json';
+import type { NotificationConfig } from '@/lib/types';
 
-const DEMO_CONFIG: NotificationConfig = {
+const DEFAULT_CONFIG: NotificationConfig = {
   id: 1,
-  from_email: "alerts@ugt-reliability.com",
-  email_recipients: ["engineer@ugt.co.th", "manager@ugt.co.th"],
+  email_recipients: [],
   enable_critical_alerts: true,
   enable_weekly_summary: false,
 };
 
-// `supabase` is passed only by the cron route, which has no user session.
-export async function getNotificationConfig(supabase?: SupabaseClient): Promise<NotificationConfig> {
-  if (isDemoMode()) return DEMO_CONFIG;
-  supabase ??= createClient();
-  const { data } = await supabase.from("notification_config").select("*").eq("id", 1).maybeSingle();
-  return (data as NotificationConfig) ?? DEMO_CONFIG;
+// Same row for every caller (the weekly-digest cron has no session; the config is
+// readable by any signed-in user, as before).
+export async function getNotificationConfig(): Promise<NotificationConfig> {
+  const row = await prisma.notificationConfig.findUnique({ where: { id: 1 } });
+  if (!row) return DEFAULT_CONFIG;
+  return {
+    id: row.id,
+    email_recipients: parseList(row.email_recipients),
+    enable_critical_alerts: row.enable_critical_alerts,
+    enable_weekly_summary: row.enable_weekly_summary,
+  };
 }

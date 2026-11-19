@@ -1,45 +1,48 @@
-import { NextResponse } from "next/server";
-import { sendEmail } from "@/lib/email/send";
-import { buildWeeklyDigest } from "@/lib/email/weekly-digest-build";
-import { getNotificationConfig } from "@/lib/queries/notifications";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { isDemoMode } from "@/lib/env";
+import { timingSafeEqual } from 'node:crypto';
+import { NextResponse } from 'next/server';
+import { env } from '@/lib/env';
+import { sendEmail } from '@/lib/email/send';
+import { buildWeeklyDigest } from '@/lib/email/weekly-digest-build';
+import { getNotificationConfig } from '@/lib/queries/notifications';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
-// Vercel Cron: GET /api/cron/weekly-digest — scheduled in vercel.json, every
-// Monday 06:00 UTC. Cron has no user session, so it reads with the service-role
-// client (the whole fleet, like a global admin view).
-export async function GET(request: Request) {
-  // The cron endpoint can send emails to real recipients — ALWAYS require the
-  // Vercel cron secret (previously the guard was skipped when CRON_SECRET was
-  // unset, leaving the route open to any authenticated caller).
-  if (!process.env.CRON_SECRET) {
-    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 503 });
+// Cron service (docker-compose.yml): POST /api/cron/weekly-digest with `Authorization: Bearer $CRON_SECRET`,
+// every Monday 13:00. No user session, so it reads the
+// whole fleet, like a global admin view.
+function authorized(request: Request): boolean {
+  if (!env.CRON_SECRET) return false;
+  const want = Buffer.from(`Bearer ${env.CRON_SECRET}`);
+  const got = Buffer.from(request.headers.get('authorization') ?? '');
+  return got.length === want.length && timingSafeEqual(got, want);
+}
+
+async function run(request: Request) {
+  // Sends to real recipients — ALWAYS require the secret.
+  if (!env.CRON_SECRET) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 503 });
   }
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!authorized(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const admin = isDemoMode() ? undefined : createAdminClient();
-    const cfg = await getNotificationConfig(admin);
+    const cfg = await getNotificationConfig();
     if (!cfg.enable_weekly_summary || !cfg.email_recipients.length) {
-      return NextResponse.json({ ok: true, message: "Weekly digest disabled or no recipients" });
+      return NextResponse.json({ ok: true, message: 'Weekly digest disabled or no recipients' });
     }
 
-    const { subject, html } = await buildWeeklyDigest(admin);
-
+    const { subject, html } = await buildWeeklyDigest(true);
     const result = await sendEmail({
       to: cfg.email_recipients,
-      from: cfg.from_email,
       subject,
       html,
     });
-
     return NextResponse.json(result);
   } catch (e) {
-    return NextResponse.json({ error: "เกิดข้อผิดพลาดภายในระบบ" }, { status: 500 });
+    console.error('[cron] weekly-digest', e);
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาดภายในระบบ' }, { status: 500 });
   }
 }
+
+export const POST = run;

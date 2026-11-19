@@ -3,10 +3,12 @@
 Date: 2026-10-28 · Status: approved in chat ("โอเค", "ทำทั้งหมด")
 
 ## Goal
+
 The app becomes lubrication monitoring only. Every module in the sidebar group
 "PM MANAGEMENT CENTER" is removed from the app.
 
 ## Decisions
+
 - Scope **C**: all 9 items — PM Compliance Hub, PM Calendar, Work Orders,
   PM Master Setup, PM Alert Center, EAM Reporting, AI Reliability Center,
   AI Fleet Chat, Budget Tracker.
@@ -18,6 +20,7 @@ The app becomes lubrication monitoring only. Every module in the sidebar group
   instead of the Work Order draft. No copy button.
 
 ## Removed
+
 - Routes: `app/(app)/{pm,work-orders,budget,eam,ai-reliability,ai-chat}`,
   `app/api/ai/fleet-chat`, `app/(print)/print/ai-chat`.
 - Components: `components/{pm,workorders,budget,eam,ai-reliability}`,
@@ -32,6 +35,7 @@ The app becomes lubrication monitoring only. Every module in the sidebar group
   hides these keys even when Supabase still returns them.
 
 ## Changed
+
 - Data Entry: drop `woDraft` / `createWorkOrder`; show the warning text when the
   result is Warning or Critical.
 - Dashboard: drop `canCreateWo` and its create-WO button.
@@ -42,18 +46,21 @@ The app becomes lubrication monitoring only. Every module in the sidebar group
 - Demo audit log: drop the `work_orders` sample row.
 
 ## Unchanged
+
 Health Score (`compute_health`, `lib/scoring/audit.ts`), Drill-down + AI
 Diagnostic, `api/ai/{diagnose,rca,exec-summary,standard}` (used by Drill-down,
 Reports, Standards), Sampling, Reports, `maintenance:write` (Asset page uses it),
 all SQL migrations.
 
 ## Verification
+
 `npm run typecheck`, `npm run lint`, `npm run build`, `npm test` pass. In Demo
 Mode the sidebar shows the main group + Admin only, removed URLs return 404,
 and health scores match across Dashboard / Watchlist / Drill-down.
 Docs (`PRD.md`, `AGENTS.md`, `Plan.md`) updated to match.
 
 ## Task order
+
 1. Delete routes, components, lib modules.
 2. Fix the pages that still import them (Data Entry, Dashboard, search,
    digest, notifications, roles, demo-data, nav).

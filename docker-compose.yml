@@ -1,0 +1,135 @@
+# Production compose — deployed by Jenkins on the `main` branch.
+# Jenkins always runs `docker compose up -d --no-build`, so the build: section
+# is never used at deploy time; NEXT_PUBLIC_* are passed via --build-arg in the
+# Jenkinsfile Docker Build stage.
+#
+# Placeholders: ugt-lube-monitoring, 3000, /ugt-lube-monitoring
+services:
+  app:
+    build:
+      context: .
+      target: runner
+    image: ugt-lube-monitoring:latest
+    # Image is built locally by Jenkins — never pull from Docker Hub
+    pull_policy: never
+    container_name: ugt-lube-monitoring
+    restart: unless-stopped
+    ports:
+      # Host port comes from .env (APP_PORT) with a default; container port is
+      # always 3000
+      - '${APP_PORT:-3000}:3000'
+    # persistent data (org contract: bind mount under /home/docker02/appdata) — attachment files
+    volumes:
+      - /home/docker02/appdata/ugt-lube-monitoring/storage:/app/storage
+    networks:
+      - proxy-network
+    environment:
+      # FIXED LIST — same keys, same order in every org project (= .env.example
+      # sections 1–5, ugt-nextjs-database-setup/assets/env.example). Values come
+      # from .env (the Jenkins Secret File copied at deploy). A module not
+      # installed keeps its lines commented; its setup skill uncomments them.
+      # Only the keys listed here reach the container — .env just fills ${VAR}:
+      # a new runtime var is added here AND in the other compose file, same PR.
+      # NEVER put NEXT_PUBLIC_* here (build args — no effect at runtime) and
+      # NEVER bake secrets into image layers.
+      # 1. runtime
+      NODE_ENV: production
+      NODE_TLS_REJECT_UNAUTHORIZED: '0' # org standard, always on: closed intranet + internal-CA Keycloak/LDAP
+      TZ: Asia/Bangkok # org standard, always on: without it every local-date calculation runs 7 hours off (UTC)
+      CRON_SECRET: ${CRON_SECRET} # [CRON] the cron service (docker-compose.yml) → /api/cron/<job>
+      # 2. database
+      DATABASE_URL: ${DATABASE_URL} # [DB]
+      # 3. auth
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET} # [AUTH]
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL} # [AUTH]
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS} # [AUTH]
+      ORG_EMAIL_DOMAINS: ${ORG_EMAIL_DOMAINS:-} # [AUTH] first = canonical, e.g. ube.co.th,ube.com
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER} # [AUTH: SSO]
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID} # [AUTH: SSO]
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET} # [AUTH: SSO]
+      # LDAP_URL: ${LDAP_URL}                                       # [AUTH: LDAP]
+      # LDAP_BASE_DN: ${LDAP_BASE_DN}                               # [AUTH: LDAP]
+      # LDAP_DOMAIN: ${LDAP_DOMAIN}                                 # [AUTH: LDAP]
+      # 4. mail
+      SMTP_HOST: ${SMTP_HOST} # [MAIL]
+      SMTP_PORT: ${SMTP_PORT:-25} # [MAIL]
+      SMTP_SECURE: ${SMTP_SECURE:-false} # [MAIL]
+      SMTP_USER: ${SMTP_USER:-} # [MAIL]
+      SMTP_PASS: ${SMTP_PASS:-} # [MAIL]
+      SMTP_FROM: ${SMTP_FROM} # [MAIL]
+      # 5. upload
+      STORAGE_ROOT: /app/storage # [UPLOAD]
+      UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-26214400} # [UPLOAD]
+      # 6. project-specific — add below, same order as .env.example section 6
+      AI_PROVIDER: ${AI_PROVIDER:-glm}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+    healthcheck:
+      # Always 127.0.0.1 (NOT localhost — Alpine resolves it to IPv6 ::1) and
+      # always internal port 3000 (container-internal, not the host port)
+      test:
+        ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/ugt-lube-monitoring/api/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # [CRON] scheduled jobs — prod only, deployed together with the app (references/scheduled-jobs.md).
+  # Never in docker-compose.dev.yml (the job would run in both environments).
+  # Same shape as ugt-hrms: busybox crond in plain alpine, crontab written at start-up (a
+  # bind-mounted file would vanish with Jenkins' cleanWs). Deliberate details:
+  #  - ${CRON_SECRET} is filled in by compose, because busybox crond gives jobs a minimal env
+  #    of their own; keep crond at -l 8 — a chattier level logs each command, token included
+  #  - the app is called by its CONTAINER name: every org project's service is named `app` on
+  #    the shared proxy-network, so `http://app:3000` can land on another project's container
+  #  - TZ=ICT-7 is a POSIX zone string, so no tzdata download at every start
+  #  - one line per /api/cron/<job> route; output + FAILED go to `docker logs ugt-lube-monitoring-cron`
+  #  - weekly-digest Monday 13:00 (owner confirmed 2026-11-16) · attachments-sweep daily 02:00
+  cron:
+    image: alpine:3.20
+    container_name: ugt-lube-monitoring-cron
+    restart: unless-stopped
+    depends_on:
+      - app
+    networks:
+      - proxy-network
+    environment:
+      TZ: ICT-7
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/crontabs/root <<'CRONTAB'
+        0 13 * * 1 wget -qO- -T 600 --post-data= --header="Authorization: Bearer ${CRON_SECRET}" http://ugt-lube-monitoring:3000/ugt-lube-monitoring/api/cron/weekly-digest >/proc/1/fd/1 2>&1 && echo " [cron] weekly-digest ok" >/proc/1/fd/1 || echo "[cron] weekly-digest FAILED" >/proc/1/fd/1
+        0 2 * * * wget -qO- -T 600 --post-data= --header="Authorization: Bearer ${CRON_SECRET}" http://ugt-lube-monitoring:3000/ugt-lube-monitoring/api/cron/attachments-sweep >/proc/1/fd/1 2>&1 && echo " [cron] attachments-sweep ok" >/proc/1/fd/1 || echo "[cron] attachments-sweep FAILED" >/proc/1/fd/1
+        CRONTAB
+        exec crond -f -l 8
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+
+networks:
+  # Shared reverse-proxy network on the Docker host (created once, externally)
+  proxy-network:
+    external: true

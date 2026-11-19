@@ -4,6 +4,7 @@
 > Stack แต่ละชั้นคือ context ที่ส่งเข้า agent ตามลำดับ
 >
 > ไฟล์ที่เกี่ยวข้อง (วางไว้ใน workspace เดียวกับ agent):
+>
 > - `PRD.md` — master spec (domain + สถาปัตยกรรม + data model + สูตร Health Score)
 > - `supabase/0001_schema.sql` — schema + RLS + `compute_health` + triggers
 > - `supabase/0002_seed.sql` — reference data + standards + `seed_sample_assets(500)`
@@ -88,5 +89,7 @@ Implement Phase P2 ต่อจาก P1 ตาม PRD.md (section 7.14–7.16, 
 ---
 
 ## 🧩 แยกเป็น module-level (ถ้าเฟสใหญ่เกินไป)
+
 ใช้ร่วมกับ Stack 1 (master context) แล้วส่งเฉพาะ module ที่ต้องการ ทีละตัว โดยอ้าง section ใน PRD.md:
+
 - `Implement module <ชื่อ> ตาม PRD.md section <X.Y> ให้ parity ต้นแบบ HTML ส่วน pg-<id>; ผ่าน RLS; deploy ได้`

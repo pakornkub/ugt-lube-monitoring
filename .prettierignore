@@ -1,0 +1,19 @@
+# Prettier ignore patterns
+.next/
+node_modules/
+coverage/
+test-results/
+lib/generated/
+public/
+*.min.js
+package-lock.json
+HTML/
+Lubrication Monitoring Platform/
+Logo/
+*.pptx
+prisma/seed-data/
+.agents/
+test-results/
+# prose docs + agent rules: not formatted (avoid churn in hand-written Thai tables)
+*.md
+.claude/

@@ -1,13 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { isDemoMode } from "@/lib/env";
-import { requirePermission } from "@/lib/actions/guards";
-import type { Profile } from "@/lib/types";
+import { prisma } from '@/lib/prisma';
+import { parseList } from '@/lib/db/json';
+import { requirePermission } from '@/lib/actions/guards';
 
 export interface UserRow {
   id: string;
   email: string;
   full_name: string | null;
+  /** Role id — "" while the user has no role yet (first SSO login). */
   role: string;
   site_access: string[];
   created_at: string;
@@ -15,70 +14,51 @@ export interface UserRow {
 
 const PAGE_SIZE = 20;
 
-const DEMO_USERS: UserRow[] = [
-  { id: "demo-1", email: "admin@ugt.co.th", full_name: "Plant Admin", role: "admin", site_access: [], created_at: "2026-01-15" },
-  { id: "demo-2", email: "engineer@ugt.co.th", full_name: "Senior Engineer", role: "engineer", site_access: [], created_at: "2026-02-01" },
-  { id: "demo-3", email: "manager@ugt.co.th", full_name: "Maintenance Manager", role: "manager", site_access: ["UT"], created_at: "2026-01-20" },
-  { id: "demo-4", email: "viewer@ugt.co.th", full_name: "Plant Viewer", role: "viewer", site_access: ["PCD"], created_at: "2026-03-10" },
-];
+/** The users-admin tab listing people who signed in (SSO) but have no role yet. */
+export const NO_ROLE_TAB = 'no-role';
 
-export async function listUsers(opts: { q?: string; page?: number; pageSize?: number } = {}): Promise<{
+export async function listUsers(
+  opts: { q?: string; page?: number; pageSize?: number; tab?: string } = {}
+): Promise<{
   rows: UserRow[];
   total: number;
   page: number;
   pages: number;
   pageSize: number;
+  /** users with no role yet — the "ยังไม่มีบทบาท" tab badge (before the search filter) */
+  noRoleCount: number;
 }> {
-  const q = (opts.q ?? "").trim().toLowerCase();
+  const q = (opts.q ?? '').trim().toLowerCase();
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? PAGE_SIZE;
 
-  let all: UserRow[];
-  if (isDemoMode()) {
-    all = DEMO_USERS;
-  } else {
-    // Defense in depth: this reads through the service-role client (bypasses
-    // RLS) via auth.admin.listUsers() below — every current call site already
-    // gates on admin role before calling this, but re-check here too so a
-    // future call site can't accidentally leak the full user list.
-    const auth = await requirePermission("users:manage");
-    if (!auth.ok) throw new Error(auth.error.message);
+  // Defense in depth: every call site already gates on users:manage — re-check so a
+  // future call site can't leak the full user list.
+  const auth = await requirePermission('users:manage');
+  if (!auth.ok) throw new Error(auth.error.message);
 
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id,full_name,role,site_access,created_at")
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, name: true, roleId: true, siteAccess: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  let all: UserRow[] = users.map((u) => ({
+    id: u.id,
+    email: u.email,
+    full_name: u.name,
+    role: u.roleId ?? '',
+    site_access: parseList(u.siteAccess),
+    created_at: u.createdAt.toISOString(),
+  }));
 
-    const profiles = (data ?? []) as Profile[];
-
-    // Fetch all emails in ONE service-role call (auth.admin.* requires the
-    // service-role key — the anon-key user client cannot read them). RLS on
-    // profiles still limits which rows are visible to non-admins.
-    const admin = createAdminClient();
-    const { data: authUsers } = await admin.auth.admin.listUsers();
-    const emailByUid = new Map(
-      (authUsers?.users ?? []).map((u) => [u.id, u.email]),
-    );
-
-    all = profiles.map((p) => ({
-      id: p.id,
-      email: emailByUid.get(p.id) ?? "—",
-      full_name: p.full_name,
-      role: p.role,
-      site_access: p.site_access,
-      created_at: p.created_at ?? "",
-    }));
-  }
-
-  if (q) all = all.filter((u) => `${u.email} ${u.full_name ?? ""}`.toLowerCase().includes(q));
+  const noRoleCount = all.filter((u) => !u.role).length;
+  if (opts.tab === NO_ROLE_TAB) all = all.filter((u) => !u.role);
+  if (q) all = all.filter((u) => `${u.email} ${u.full_name ?? ''}`.toLowerCase().includes(q));
 
   const total = all.length;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const p = Math.min(Math.max(1, page), pages);
   const start = (p - 1) * pageSize;
-  return { rows: all.slice(start, start + pageSize), total, page: p, pages, pageSize };
+  return { rows: all.slice(start, start + pageSize), total, page: p, pages, pageSize, noRoleCount };
 }
 
 /**
@@ -86,14 +66,24 @@ export async function listUsers(opts: { q?: string; page?: number; pageSize?: nu
  * `withoutUser` lost it (role change). Counting roles is not enough: a role nobody holds keeps
  * the old check happy while no one can open the Admin pages any more. Fails closed (0) on error.
  */
-export async function managersLeft(opts: { withoutRole?: string; withoutUser?: string }): Promise<number> {
-  const admin = createAdminClient();
-  const { data: roles, error } = await admin.from("role_permissions").select("role_id").eq("permission_key", "users:manage");
-  if (error) return 0;
-  const ids = (roles ?? []).map((r) => r.role_id as string).filter((r) => r !== opts.withoutRole);
-  if (!ids.length) return 0;
-  let q = admin.from("profiles").select("id", { count: "exact", head: true }).in("role", ids);
-  if (opts.withoutUser) q = q.neq("id", opts.withoutUser);
-  const { count, error: cErr } = await q;
-  return cErr ? 0 : count ?? 0;
+export async function managersLeft(opts: {
+  withoutRole?: string;
+  withoutUser?: string;
+}): Promise<number> {
+  try {
+    const roles = await prisma.rolePermission.findMany({
+      where: { permission: { key: 'users:manage' } },
+      select: { roleId: true },
+    });
+    const ids = roles.map((r) => r.roleId).filter((r) => r !== opts.withoutRole);
+    if (!ids.length) return 0;
+    return await prisma.user.count({
+      where: {
+        roleId: { in: ids },
+        ...(opts.withoutUser ? { id: { not: opts.withoutUser } } : {}),
+      },
+    });
+  } catch {
+    return 0;
+  }
 }

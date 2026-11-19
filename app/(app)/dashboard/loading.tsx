@@ -1,4 +1,4 @@
-import { KpiRowSkeleton, ChartRowSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
+import { KpiRowSkeleton, ChartRowSkeleton, TableSkeleton } from '@/components/ui/LoadingSkeletons';
 
 export default function Loading() {
   return (

@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
 // Chart.js draws onto a <canvas>, so its tick/grid/label colors are plain
 // hex strings baked into the render call — they can't respond to the CSS
@@ -12,11 +12,11 @@ export function useIsDarkMode(): boolean {
 
   useEffect(() => {
     const root = document.documentElement;
-    setDark(root.getAttribute("data-theme") === "dark");
+    setDark(root.getAttribute('data-theme') === 'dark');
     const observer = new MutationObserver(() => {
-      setDark(root.getAttribute("data-theme") === "dark");
+      setDark(root.getAttribute('data-theme') === 'dark');
     });
-    observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
     return () => observer.disconnect();
   }, []);
 

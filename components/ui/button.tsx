@@ -1,0 +1,67 @@
+import { Button as ButtonPrimitive } from '@base-ui/react/button';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from 'cn';
+
+const buttonVariants = cva(
+  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-sm font-semibold whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/80',
+        outline:
+          'border-border hover:bg-input/50 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-input/30',
+        secondary:
+          'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
+        ghost:
+          'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50',
+        // แดงทึบ ตัวอักษรขาว — ยืนยันลบ/ทำลายข้อมูล (มติ 2026-10-16 D6 แทน "ยึด preset แดงจาง")
+        destructive:
+          'bg-destructive text-white hover:bg-destructive/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:hover:bg-destructive/70 dark:focus-visible:ring-destructive/40',
+        // org sanctioned (design-setup assets/ui/button-variants.md)
+        success: 'bg-status-emerald text-white hover:bg-status-emerald/90',
+        soft: 'border-primary/25 bg-primary/10 text-primary hover:bg-primary/15 aria-expanded:bg-primary/15',
+        'soft-primary': 'text-primary hover:bg-primary/10 hover:text-primary',
+        'soft-destructive': 'text-destructive hover:bg-destructive/10 hover:text-destructive',
+        'soft-success': 'text-status-emerald hover:bg-status-emerald/10 hover:text-status-emerald',
+        field:
+          'border-input bg-input/20 hover:bg-input/50 hover:text-foreground aria-expanded:border-ring aria-expanded:ring-2 aria-expanded:ring-ring/30 disabled:border-transparent disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 dark:bg-input/30 dark:hover:bg-input/50 dark:disabled:bg-muted',
+        link: 'text-primary underline-offset-4 hover:underline',
+      },
+      size: {
+        // scale bridge (DESIGN.md §4, ยึดของเดิม): the app's button — 36px, px-4, 14px
+        default:
+          "h-9 gap-1.5 px-4 text-sm has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg:not([class*='size-'])]:size-4",
+        xs: "h-7 gap-1 px-2 text-sm has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-2.5",
+        sm: "h-8 gap-1.5 px-2.5 text-sm has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+        lg: "h-10 gap-1.5 px-5 text-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-4",
+        icon: "size-9 [&_svg:not([class*='size-'])]:size-4",
+        // ปุ่ม action หลักของหน้า · แถบปุ่มท้ายฟอร์ม · footer ของ dialog/sheet — มือถือ 44px · ตั้งแต่ sm 36px
+        cta: "h-11 gap-1.5 px-4 text-sm sm:h-9 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg:not([class*='size-'])]:size-4",
+        'icon-xs': "size-7 [&_svg:not([class*='size-'])]:size-2.5",
+        'icon-sm': "size-8 [&_svg:not([class*='size-'])]:size-4",
+        'icon-lg': "size-10 [&_svg:not([class*='size-'])]:size-5",
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+function Button({
+  className,
+  variant = 'default',
+  size = 'default',
+  ...props
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  return (
+    <ButtonPrimitive
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  );
+}
+
+export { Button, buttonVariants };

@@ -1,200 +1,98 @@
-"use server";
+'use server';
 
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/env";
-import { demoBlocked, runAction, type ActionResult } from "./result";
-import { requirePermission } from "./guards";
-import { demoCan } from "@/lib/queries/permissions";
-import { listStandardAttachments } from "@/lib/queries/attachments";
-import type { StandardAttachment } from "@/lib/types";
-import {
-  DOC_ATTACHMENT_EXTENSIONS,
-  DOC_ATTACHMENT_MIME_TYPES,
-  LAB_ATTACHMENT_EXTENSIONS,
-  LAB_ATTACHMENT_MIME_TYPES,
-  MAX_DOC_ATTACHMENT_BYTES,
-  MAX_LAB_ATTACHMENT_BYTES,
-  validateAttachment,
-} from "@/lib/attachment-rules";
-import { isLocalStore } from "@/lib/env";
-import { isPeriod } from "@/lib/parse/period";
-import { deleteLocalAttachment, getLocalAttachment } from "@/lib/local-store";
+import { revalidatePath } from 'next/cache';
+import { prisma } from '@/lib/prisma';
+import { env } from '@/lib/env';
+import { runAction, type ActionResult } from './result';
+import { requireAssetPermission, requirePermission } from './guards';
+import { logAudit } from './audit-log';
+import { AUDIT_ACTIONS } from '@/lib/audit-actions';
+import { listStandardAttachments } from '@/lib/queries/attachments';
+import type { StandardAttachment } from '@/lib/types';
 
-const BUCKET = "lab-attachments";
-const STD_BUCKET = "standard-attachments";
+// Uploads go through POST /api/files (lib/upload-client.ts) — a Route Handler,
+// because Server Actions cap the body at 1 MB. Downloads go through the guarded
+// GET /api/files/<target>/<id>. Deleting is a soft delete; the retention sweep
+// removes the bytes after 90 days (app/api/cron/attachments-sweep).
 
-export interface RegisterInput {
-  assetId: string;
-  period: string;
-  kind: "oil" | "vib";
-  fileName: string;
-  storagePath: string;
-  mimeType: string | null;
-  sizeBytes: number | null;
-}
-
-export async function registerAttachment(input: RegisterInput): Promise<ActionResult> {
-  if (isDemoMode()) return demoBlocked();
-  return runAction(async () => {
-  const auth = await requirePermission("attachments:write");
-  if (!auth.ok) return auth.error;
-  const invalid = validateAttachment(input.fileName, input.mimeType, input.sizeBytes, MAX_LAB_ATTACHMENT_BYTES, LAB_ATTACHMENT_MIME_TYPES, LAB_ATTACHMENT_EXTENSIONS);
-  if (invalid) return { ok: false, message: invalid };
-  // the row must point at this machine's own file (<asset>/<period>/...), in a real period
-  if (!isPeriod(input.period)) return { ok: false, message: "งวดไม่ถูกต้อง" };
-  if (!input.storagePath.startsWith(`${input.assetId}/${input.period}/`) || input.storagePath.includes("..")) {
-    return { ok: false, message: "ตำแหน่งไฟล์ไม่ตรงกับเครื่องจักรนี้" };
-  }
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { error } = await supabase.from("reading_attachments").insert({
-    asset_id: input.assetId,
-    period: input.period,
-    kind: input.kind,
-    file_name: input.fileName,
-    storage_path: input.storagePath,
-    mime_type: input.mimeType,
-    size_bytes: input.sizeBytes,
-    uploaded_by: user?.id ?? null,
-  });
-  if (error) return { ok: false, message: error.message };
-  revalidatePath(`/assets/${input.assetId}`);
-  revalidatePath("/data-entry");
-  return { ok: true, message: "แนบไฟล์สำเร็จ" };
-  });
+function fileUrl(target: 'reading' | 'standard', id: string): string {
+  return `${env.NEXT_PUBLIC_BASE_PATH}/api/files/${target}/${id}`;
 }
 
 export async function createDownloadUrl(
-  storagePath: string,
+  storagePath: string
 ): Promise<{ ok: boolean; url?: string; message: string }> {
-  if (isLocalStore()) {
-    return { ok: true, url: `/api/local-store/file?path=${encodeURIComponent(storagePath)}`, message: "ok" };
-  }
-  if (isDemoMode()) return { ok: false, message: "ยังไม่มีไฟล์จริง — ต้องเชื่อม Supabase ก่อน" };
   return runAction(async () => {
-  const auth = await requirePermission("attachments:read");
-  if (!auth.ok) return auth.error;
-  // Storage RLS ("lab_att_read") independently re-checks that the caller can
-  // access the owning asset's site — this guard only confirms authentication.
-  const supabase = createClient();
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(storagePath, 3600);
-  if (error || !data?.signedUrl) {
-    return { ok: false, message: error?.message ?? "สร้างลิงก์ดาวน์โหลดไม่สำเร็จ" };
-  }
-  return { ok: true, url: data.signedUrl, message: "ok" };
+    const auth = await requirePermission('attachments:read');
+    if (!auth.ok) return auth.error;
+    const row = await prisma.readingAttachment.findFirst({
+      where: { storage_path: storagePath, is_deleted: false },
+      select: { id: true },
+    });
+    if (!row) return { ok: false, message: 'ไม่พบไฟล์' };
+    return { ok: true, url: fileUrl('reading', row.id), message: 'ok' };
   });
 }
 
 export async function deleteAttachment(
   id: string,
-  storagePath: string,
-  assetId: string,
+  _storagePath: string,
+  assetId: string
 ): Promise<ActionResult> {
-  if (isLocalStore()) {
-    if (!demoCan("attachments:write")) return { ok: false, message: "ไม่มีสิทธิ์ดำเนินการนี้ (attachments:write)" };
-    const row = getLocalAttachment(id);
-    if (!row || row.storage_path !== storagePath) return { ok: false, message: "ไม่พบไฟล์แนบ" };
-    deleteLocalAttachment(id);
+  return runAction(async () => {
+    const auth = await requireAssetPermission('attachments:write', assetId);
+    if (!auth.ok) return auth.error;
+    const { count } = await prisma.readingAttachment.updateMany({
+      where: { id, asset_id: assetId, is_deleted: false },
+      data: { is_deleted: true, updated_by: auth.userId },
+    });
+    if (!count) return { ok: false, message: 'ไม่พบรายการนี้ หรือไม่มีสิทธิ์แก้ไขรายการของโรงงานนี้' };
+    await logAudit({
+      action: AUDIT_ACTIONS.FILE_DELETE,
+      table_name: 'reading_attachments',
+      record_id: id,
+    });
     revalidatePath(`/assets/${assetId}`);
-    return { ok: true, message: "ลบไฟล์แนบสำเร็จ (ในเครื่อง)" };
-  }
-  if (isDemoMode()) return demoBlocked();
-  return runAction(async () => {
-  const auth = await requirePermission("attachments:write");
-  if (!auth.ok) return auth.error;
-  const supabase = createClient();
-  const { data: deleted, error } = await supabase.from("reading_attachments").delete().eq("id", id).select("storage_path");
-  if (error) return { ok: false, message: error.message };
-  if (!deleted?.length) return { ok: false, message: "ไม่พบรายการนี้ หรือไม่มีสิทธิ์แก้ไขรายการของโรงงานนี้" };
-  const { error: storageErr } = await supabase.storage.from(BUCKET).remove([deleted[0].storage_path as string]);
-  revalidatePath(`/assets/${assetId}`);
-  if (storageErr) {
-    console.error("[deleteAttachment] storage removal failed", storageErr);
-    return { ok: true, message: "ลบข้อมูลแนบสำเร็จ แต่ไฟล์ในสตอเรจอาจยังไม่ถูกลบ" };
-  }
-  return { ok: true, message: "ลบไฟล์แนบสำเร็จ" };
+    return { ok: true, message: 'ลบไฟล์แนบสำเร็จ' };
   });
 }
 
-// ---- Standards attachments (PDF originals in the Standards Library) ----
-
-export interface RegisterStandardInput {
-  standardId: string;
-  fileName: string;
-  storagePath: string;
-  mimeType: string | null;
-  sizeBytes: number | null;
-}
-
-export async function registerStandardAttachment(
-  input: RegisterStandardInput,
-): Promise<ActionResult> {
-  if (isDemoMode()) return demoBlocked();
-  return runAction(async () => {
-  const auth = await requirePermission("attachments:write");
-  if (!auth.ok) return auth.error;
-  const invalid = validateAttachment(input.fileName, input.mimeType, input.sizeBytes, MAX_DOC_ATTACHMENT_BYTES, DOC_ATTACHMENT_MIME_TYPES, DOC_ATTACHMENT_EXTENSIONS);
-  if (invalid) return { ok: false, message: invalid };
-  if (!input.storagePath.startsWith(`${input.standardId}/`) || input.storagePath.includes("..")) {
-    return { ok: false, message: "ตำแหน่งไฟล์ไม่ตรงกับมาตรฐานนี้" };
-  }
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { error } = await supabase.from("standard_attachments").insert({
-    standard_id: input.standardId,
-    file_name: input.fileName,
-    storage_path: input.storagePath,
-    mime_type: input.mimeType,
-    size_bytes: input.sizeBytes,
-    uploaded_by: user?.id ?? null,
-  });
-  if (error) return { ok: false, message: error.message };
-  revalidatePath("/standards");
-  return { ok: true, message: "แนบไฟล์สำเร็จ" };
-  });
-}
+// ---- Standards attachments (originals in the Standards Library) ----
 
 export async function createStandardDownloadUrl(
-  storagePath: string,
+  storagePath: string
 ): Promise<{ ok: boolean; url?: string; message: string }> {
-  if (isDemoMode()) return { ok: false, message: "ยังไม่มีไฟล์จริง — ต้องเชื่อม Supabase ก่อน" };
   return runAction(async () => {
-  const auth = await requirePermission("attachments:read");
-  if (!auth.ok) return auth.error;
-  const supabase = createClient();
-  const { data, error } = await supabase.storage.from(STD_BUCKET).createSignedUrl(storagePath, 3600);
-  if (error || !data?.signedUrl) {
-    return { ok: false, message: error?.message ?? "สร้างลิงก์ดาวน์โหลดไม่สำเร็จ" };
-  }
-  return { ok: true, url: data.signedUrl, message: "ok" };
+    const auth = await requirePermission('attachments:read');
+    if (!auth.ok) return auth.error;
+    const row = await prisma.standardAttachment.findFirst({
+      where: { storage_path: storagePath, is_deleted: false },
+      select: { id: true },
+    });
+    if (!row) return { ok: false, message: 'ไม่พบไฟล์' };
+    return { ok: true, url: fileUrl('standard', row.id), message: 'ok' };
   });
 }
 
 export async function deleteStandardAttachment(
   id: string,
-  storagePath: string,
+  _storagePath: string
 ): Promise<ActionResult> {
-  if (isDemoMode()) return demoBlocked();
   return runAction(async () => {
-  const auth = await requirePermission("attachments:write");
-  if (!auth.ok) return auth.error;
-  const supabase = createClient();
-  // delete the row first and remove the file it points to, not the path the browser sent
-  const { data: deleted, error } = await supabase.from("standard_attachments").delete().eq("id", id).select("storage_path");
-  if (error) return { ok: false, message: error.message };
-  if (!deleted?.length) return { ok: false, message: "ไม่พบรายการนี้ หรือไม่มีสิทธิ์แก้ไขรายการนี้" };
-  const { error: storageErr } = await supabase.storage.from(STD_BUCKET).remove([deleted[0].storage_path as string]);
-  revalidatePath("/standards");
-  if (storageErr) {
-    console.error("[deleteStandardAttachment] storage removal failed", storageErr);
-    return { ok: true, message: "ลบข้อมูลแนบสำเร็จ แต่ไฟล์ในสตอเรจอาจยังไม่ถูกลบ" };
-  }
-  return { ok: true, message: "ลบไฟล์แนบสำเร็จ" };
+    const auth = await requirePermission('attachments:write');
+    if (!auth.ok) return auth.error;
+    const { count } = await prisma.standardAttachment.updateMany({
+      where: { id, is_deleted: false },
+      data: { is_deleted: true, updated_by: auth.userId },
+    });
+    if (!count) return { ok: false, message: 'ไม่พบรายการนี้ หรือไม่มีสิทธิ์แก้ไขรายการนี้' };
+    await logAudit({
+      action: AUDIT_ACTIONS.FILE_DELETE,
+      table_name: 'standard_attachments',
+      record_id: id,
+    });
+    revalidatePath('/standards');
+    return { ok: true, message: 'ลบไฟล์แนบสำเร็จ' };
   });
 }
 

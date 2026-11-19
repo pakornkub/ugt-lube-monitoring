@@ -1,111 +1,121 @@
-"use server";
+'use server';
 
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { isDemoMode, isLocalStore } from "@/lib/env";
-import { appendLocalAuditMany, deleteLocalReading, getLocalOil, getLocalVib, upsertLocalOil, upsertLocalOilMany, upsertLocalVib } from "@/lib/local-store";
-import { getDemoOilHistory, isDemoAssetId } from "@/lib/demo-data";
-import { isFuturePeriod, isPeriod } from "@/lib/parse/period";
-import { STORED_COLS, readingCols } from "@/lib/reading-fields";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getReadingsHistory } from "@/lib/queries/readings";
-import type { OilReading, VibReading } from "@/lib/types";
-import { demoBlocked, runAction, type ActionResult } from "./result";
-import { requirePermission } from "./guards";
-import { demoCan } from "@/lib/queries/permissions";
-import { logAudit } from "./audit-log";
+import { revalidatePath } from 'next/cache';
+import { prisma } from '@/lib/prisma';
+import { isFuturePeriod, isPeriod } from '@/lib/parse/period';
+import { STORED_COLS, readingCols } from '@/lib/reading-fields';
+import { getReadingsHistory } from '@/lib/queries/readings';
+import { siteWhere } from '@/lib/queries/permissions';
+import { computeHealth } from '@/lib/scoring/recompute';
+import type { OilReading, VibReading } from '@/lib/types';
+import { runAction, type ActionResult } from './result';
+import { requireAssetPermission, requirePermission } from './guards';
+import { logAudit } from './audit-log';
 
 export interface ReadingInput {
   assetId: string;
   period: string; // YYYY-MM
-  kind: "oil" | "vib";
+  kind: 'oil' | 'vib';
   values: Record<string, number | string | null>;
 }
 
-// Delete one period's oil or vibration reading (a reading saved on the wrong machine or month).
-// The DB trigger (0035) recomputes the machine's Health Score from what is left.
-export async function deleteReading(input: { assetId: string; period: string; kind: "oil" | "vib" }): Promise<ActionResult> {
+type Cols = Record<string, number | string | null>;
+const key = (asset_id: string, period: string) => ({ asset_id_period: { asset_id, period } });
+
+// One reading table by kind — the two delegates have the same shape for what is used here.
+function table(kind: 'oil' | 'vib') {
+  return (kind === 'oil'
+    ? prisma.oilReading
+    : prisma.vibReading) as unknown as typeof prisma.oilReading;
+}
+
+// Delete one period's oil or vibration reading (a reading saved on the wrong machine or month),
+// then recompute the machine's Health Score from what is left.
+export async function deleteReading(input: {
+  assetId: string;
+  period: string;
+  kind: 'oil' | 'vib';
+}): Promise<ActionResult> {
   const { assetId, period, kind } = input;
-  if (!assetId || !isPeriod(period) || (kind !== "oil" && kind !== "vib")) return { ok: false, message: "ข้อมูลไม่ถูกต้อง" };
-  const done = (): ActionResult => {
-    revalidatePath("/dashboard");
-    revalidatePath("/assets");
-    revalidatePath(`/assets/${assetId}`);
-    return { ok: true, message: `ลบผล${kind === "oil" ? "น้ำมัน" : "สั่นสะเทือน"} งวด ${period} แล้ว` };
-  };
-  if (isLocalStore()) {
-    if (!demoCan("readings:write")) return { ok: false, message: "ไม่มีสิทธิ์ดำเนินการนี้ (readings:write)" };
-    if (!deleteLocalReading(kind, assetId, period)) return { ok: false, message: "งวดนี้เป็นข้อมูลตัวอย่าง (ไม่ได้บันทึกในเครื่องนี้) — ลบไม่ได้" };
-    await logAudit({ action: "DELETE", table_name: `${kind}_readings`, record_id: `${assetId}|${period}` });
-    return done();
-  }
-  if (isDemoMode()) return demoBlocked();
+  if (!assetId || !isPeriod(period) || (kind !== 'oil' && kind !== 'vib'))
+    return { ok: false, message: 'ข้อมูลไม่ถูกต้อง' };
   return runAction(async () => {
-    const auth = await requirePermission("readings:write");
+    const auth = await requireAssetPermission('readings:write', assetId);
     if (!auth.ok) return auth.error;
-    const supabase = createClient();
-    // RLS (oil_modify / vib_modify) also checks readings:write and the machine's site
-    const { data, error } = await supabase.from(`${kind}_readings`).delete().eq("asset_id", assetId).eq("period", period).select();
-    if (error) return { ok: false, message: error.message };
-    if (!data?.length) return { ok: false, message: "ไม่พบผลงวดนี้ หรือไม่มีสิทธิ์ลบ" };
-    await logAudit({ action: "DELETE", table_name: `${kind}_readings`, record_id: `${assetId}|${period}`, old_value: data[0] as Record<string, unknown> });
-    return done();
+    const old = await table(kind).findUnique({ where: key(assetId, period) });
+    if (!old) return { ok: false, message: 'ไม่พบผลงวดนี้ หรือไม่มีสิทธิ์ลบ' };
+    await table(kind).delete({ where: key(assetId, period) });
+    await computeHealth(assetId);
+    await logAudit({
+      action: 'DELETE',
+      table_name: `${kind}_readings`,
+      record_id: `${assetId}|${period}`,
+      old_value: old as unknown as Record<string, unknown>,
+    });
+    revalidatePath('/dashboard');
+    revalidatePath('/assets');
+    revalidatePath(`/assets/${assetId}`);
+    return { ok: true, message: `ลบผล${kind === 'oil' ? 'น้ำมัน' : 'สั่นสะเทือน'} งวด ${period} แล้ว` };
   });
 }
 
 export async function saveReading(input: ReadingInput): Promise<ActionResult> {
-  if (isLocalStore()) return demoCan("readings:write") ? runAction(async () => saveReadingLocal(input)) : { ok: false, message: "ไม่มีสิทธิ์ดำเนินการนี้ (readings:write)" };
-  if (isDemoMode()) return demoBlocked();
   return runAction(async () => {
-    const auth = await requirePermission("readings:write");
-    if (!auth.ok) return auth.error;
     if (!isPeriod(input.period) || !input.assetId) {
-      return { ok: false, message: "ข้อมูลไม่ครบ (เครื่องจักร / งวด)" };
+      return { ok: false, message: 'ข้อมูลไม่ครบ (เครื่องจักร / งวด)' };
     }
-    if (isFuturePeriod(input.period)) return { ok: false, message: `งวด ${input.period} อยู่ในอนาคต — ตรวจวันที่เก็บตัวอย่าง` };
-    const supabase = createClient();
-    const table = input.kind === "oil" ? "oil_readings" : "vib_readings";
+    const auth = await requireAssetPermission('readings:write', input.assetId);
+    if (!auth.ok) return auth.error;
+    if (isFuturePeriod(input.period))
+      return { ok: false, message: `งวด ${input.period} อยู่ในอนาคต — ตรวจวันที่เก็บตัวอย่าง` };
+    const t = table(input.kind);
     const cols = readingCols(input);
     // Nothing to write (e.g. a files-only save): no reading row — an empty one would
     // count as the latest reading and score 100.
     let before: Record<string, unknown> | null = null;
     if (Object.keys(cols).length > 0) {
-      const { data: old } = await supabase.from(table).select(Object.keys(cols).join(",")).eq("asset_id", input.assetId).eq("period", input.period).maybeSingle();
-      before = (old as Record<string, unknown> | null) ?? null;
-      // Only the sent columns are in the upsert, so the update leaves the others alone.
-      const { error } = await supabase.from(table).upsert({ asset_id: input.assetId, period: input.period, ...cols }, { onConflict: "asset_id,period" });
-      if (error) return { ok: false, message: error.message };
-      // Clearing the last value leaves an empty row: delete it so the previous period
-      // counts again. Deletes have no recompute trigger, so recompute here.
-      if (Object.values(cols).includes(null)) {
-        const { data: row } = await supabase.from(table).select(STORED_COLS[input.kind].join(",")).eq("asset_id", input.assetId).eq("period", input.period).maybeSingle();
-        if (row && Object.values(row).every((v) => v == null)) {
-          const { error: delErr } = await supabase.from(table).delete().eq("asset_id", input.assetId).eq("period", input.period);
-          if (delErr) return { ok: false, message: delErr.message };
-          const { error: rpcErr } = await createAdminClient().rpc("compute_health", { p_asset_id: input.assetId });
-          if (rpcErr) return { ok: false, message: rpcErr.message };
-        }
-      }
+      const old = (await t.findUnique({ where: key(input.assetId, input.period) })) as Record<
+        string,
+        unknown
+      > | null;
+      before = old ? Object.fromEntries(Object.keys(cols).map((k) => [k, old[k] ?? null])) : null;
+      // Only the sent columns are written, so the update leaves the others alone.
+      const row = (await t.upsert({
+        where: key(input.assetId, input.period),
+        update: { ...cols, updated_by: auth.userId } as never,
+        create: {
+          asset_id: input.assetId,
+          period: input.period,
+          ...cols,
+          created_by: auth.userId,
+        } as never,
+      })) as unknown as Record<string, unknown>;
+      // Clearing the last value leaves an empty row: delete it so the previous period counts again.
+      if (STORED_COLS[input.kind].every((c) => row[c] == null))
+        await t.delete({ where: key(input.assetId, input.period) });
+      await computeHealth(input.assetId);
     }
 
-    revalidatePath("/dashboard");
-    revalidatePath("/assets");
+    revalidatePath('/dashboard');
+    revalidatePath('/assets');
     revalidatePath(`/assets/${input.assetId}`);
     await logAudit({
-      action: "UPSERT",
-      table_name: input.kind === "oil" ? "oil_readings" : "vib_readings",
+      action: 'UPSERT',
+      table_name: input.kind === 'oil' ? 'oil_readings' : 'vib_readings',
       record_id: `${input.assetId}/${input.period}`,
       old_value: before ?? undefined,
       new_value: cols,
     });
-    return { ok: true, message: "บันทึกข้อมูลสำเร็จ" };
+    return { ok: true, message: 'บันทึกข้อมูลสำเร็จ' };
   });
 }
 
 // What is already saved for this machine + period, so Data Entry can show it and
 // let the user clear a wrong value (saveReading leaves unsent columns alone).
-// Reads go through RLS like every other page.
-export async function getSavedReadings(assetId: string, period: string): Promise<{ oil: OilReading | null; vib: VibReading | null }> {
+export async function getSavedReadings(
+  assetId: string,
+  period: string
+): Promise<{ oil: OilReading | null; vib: VibReading | null }> {
   if (!assetId || !isPeriod(period)) return { oil: null, vib: null };
   const h = await getReadingsHistory(assetId);
   return {
@@ -114,94 +124,26 @@ export async function getSavedReadings(assetId: string, period: string): Promise
   };
 }
 
-// Same row as the Supabase upsert above, written to lib/local-store instead.
-async function saveReadingLocal(input: ReadingInput): Promise<ActionResult> {
-  if (!isPeriod(input.period) || !input.assetId) {
-    return { ok: false, message: "ข้อมูลไม่ครบ (เครื่องจักร / งวด)" };
-  }
-  if (isFuturePeriod(input.period)) return { ok: false, message: `งวด ${input.period} อยู่ในอนาคต — ตรวจวันที่เก็บตัวอย่าง` };
-  // Supabase rejects an unknown asset_id via its foreign key; the file store must too,
-  // or the reading is orphaned and the SQL export fails on import.
-  if (!isDemoAssetId(input.assetId)) {
-    return { ok: false, message: `ไม่พบเครื่องจักร "${input.assetId}" ในระบบ — เพิ่มในฐานข้อมูลเครื่องจักรก่อน` };
-  }
-  const cols = readingCols(input);
-  if (Object.keys(cols).length > 0) {
-    const same = (r: { asset_id: string; period: string }) => r.asset_id === input.assetId && r.period === input.period;
-    const old = (input.kind === "oil" ? getLocalOil() : getLocalVib()).find(same) as Record<string, unknown> | undefined;
-    const row = { asset_id: input.assetId, period: input.period, ...cols };
-    if (input.kind === "oil") upsertLocalOil(row);
-    else upsertLocalVib(row);
-    await logAudit({
-      action: "UPSERT",
-      table_name: input.kind === "oil" ? "oil_readings" : "vib_readings",
-      record_id: `${input.assetId}/${input.period}`,
-      old_value: old ? Object.fromEntries(Object.keys(cols).map((k) => [k, old[k] ?? null])) : undefined,
-      new_value: cols,
-    });
-  }
-  // Same paths as the Supabase branch.
-  revalidatePath("/dashboard");
-  revalidatePath("/assets");
-  revalidatePath(`/assets/${input.assetId}`);
-  return { ok: true, message: "บันทึกในเครื่องแล้ว (Local Store — ยังไม่ขึ้นฐานข้อมูลกลาง)" };
-}
-
 export interface OilBatchRow {
   assetId: string;
   period: string;
   values: Record<string, number | string | null>;
 }
-export type BatchResult = ActionResult & { saved?: number; failedKeys?: string[]; failed?: string[] };
+export type BatchResult = ActionResult & {
+  saved?: number;
+  failedKeys?: string[];
+  failed?: string[];
+};
 
 const batchKey = (assetId: string, period: string) => `${assetId}|${period}`;
+const CHUNK = 1000; // SQL Server: 2100 parameters per statement
 
-// A whole lab file in one request: one permission check, one upsert per set of columns,
-// one audit insert and one page refresh. Row by row it took ~8 round trips per row, and
-// closing the tab halfway left half a file saved. Rows go into an upsert only with rows
-// that have the same columns, so a file without TAN never writes TAN = null over a saved one.
+// A whole lab file in one request: one permission check, one transaction per set of columns,
+// one audit write and one page refresh. Rows go into a transaction only with rows that have
+// the same columns, so a file without TAN never writes TAN = null over a saved one.
 export async function saveOilBatch(rows: OilBatchRow[]): Promise<BatchResult> {
-  if (isLocalStore() && !demoCan("readings:write")) return { ok: false, message: "ไม่มีสิทธิ์ดำเนินการนี้ (readings:write)" };
-  if (isLocalStore()) {
-    return runAction(async (): Promise<BatchResult> => {
-      // Same checks as saveReadingLocal, then one file write for the readings and one for the history.
-      const failedKeys: string[] = [];
-      const failed: string[] = [];
-      const fail = (r: OilBatchRow, why: string) => { failedKeys.push(batchKey(r.assetId, r.period)); failed.push(`${r.assetId} (${r.period}): ${why}`); };
-      const saved = new Map(getLocalOil().map((o) => [batchKey(o.asset_id, o.period), o as unknown as Record<string, unknown>]));
-      const upserts: ({ asset_id: string; period: string } & Record<string, number | string | null>)[] = [];
-      const history: Parameters<typeof appendLocalAuditMany>[0] = [];
-      for (const r of rows) {
-        if (!isPeriod(r.period) || !r.assetId) { fail(r, "ข้อมูลไม่ครบ (เครื่องจักร / งวด)"); continue; }
-        if (isFuturePeriod(r.period)) { fail(r, `งวด ${r.period} อยู่ในอนาคต — ตรวจวันที่เก็บตัวอย่าง`); continue; }
-        if (!isDemoAssetId(r.assetId)) { fail(r, `ไม่พบเครื่องจักร "${r.assetId}" ในระบบ — เพิ่มในฐานข้อมูลเครื่องจักรก่อน`); continue; }
-        const cols = readingCols({ kind: "oil", values: r.values });
-        if (!Object.keys(cols).length) continue;
-        const old = saved.get(batchKey(r.assetId, r.period));
-        upserts.push({ asset_id: r.assetId, period: r.period, ...cols });
-        history.push({
-          action: "UPSERT",
-          table_name: "oil_readings",
-          record_id: `${r.assetId}/${r.period}`,
-          old_value: old ? Object.fromEntries(Object.keys(cols).map((k) => [k, old[k] ?? null])) : null,
-          new_value: cols,
-        });
-      }
-      upsertLocalOilMany(upserts);
-      try {
-        appendLocalAuditMany(history);
-      } catch {
-        // history must never block the save (same as logAudit)
-      }
-      revalidatePath("/dashboard");
-      revalidatePath("/assets", "layout");
-      const n = rows.length - failed.length;
-      return { ok: failed.length === 0, saved: n, failedKeys, failed, message: `บันทึกในเครื่อง ${n} รายการ` };
-    });
-  }
-  if (isDemoMode()) return demoBlocked();
   return runAction(async (): Promise<BatchResult> => {
-    const auth = await requirePermission("readings:write");
+    const auth = await requirePermission('readings:write');
     if (!auth.ok) return auth.error;
     const failedKeys: string[] = [];
     const failed: string[] = [];
@@ -209,79 +151,124 @@ export async function saveOilBatch(rows: OilBatchRow[]): Promise<BatchResult> {
       failedKeys.push(batchKey(assetId, period));
       failed.push(`${assetId} (${period}): ${why}`);
     };
-    const good: ({ asset_id: string; period: string } & Record<string, number | string | null>)[] = [];
-    for (const r of rows) {
-      const cols = readingCols({ kind: "oil", values: r.values });
-      if (!r.assetId || !isPeriod(r.period)) fail(r.assetId, r.period, "ข้อมูลไม่ครบ (เครื่องจักร / งวด)");
-      else if (isFuturePeriod(r.period)) fail(r.assetId, r.period, `งวด ${r.period} อยู่ในอนาคต`);
-      else if (Object.keys(cols).length > 0) good.push({ asset_id: r.assetId, period: r.period, ...cols });
+
+    // Machines the user may write (their plants) — an unknown or hidden TAG never creates a row.
+    const askedIds = [...new Set(rows.map((r) => r.assetId).filter(Boolean))];
+    const known = new Set<string>();
+    const scope = await siteWhere();
+    for (let i = 0; i < askedIds.length; i += CHUNK) {
+      const found = await prisma.asset.findMany({
+        where: { id: { in: askedIds.slice(i, i + CHUNK) }, ...scope },
+        select: { id: true },
+      });
+      for (const a of found) known.add(a.id);
     }
-    const supabase = createClient();
+
+    const good: ({ asset_id: string; period: string } & Cols)[] = [];
+    for (const r of rows) {
+      const cols = readingCols({ kind: 'oil', values: r.values });
+      if (!r.assetId || !isPeriod(r.period))
+        fail(r.assetId, r.period, 'ข้อมูลไม่ครบ (เครื่องจักร / งวด)');
+      else if (isFuturePeriod(r.period)) fail(r.assetId, r.period, `งวด ${r.period} อยู่ในอนาคต`);
+      else if (!known.has(r.assetId))
+        fail(r.assetId, r.period, `ไม่พบเครื่องจักร "${r.assetId}" ในระบบ หรือไม่มีสิทธิ์เข้าถึงโรงงานนี้`);
+      else if (Object.keys(cols).length > 0)
+        good.push({ asset_id: r.assetId, period: r.period, ...cols });
+    }
 
     // Old values for the audit log (only the machines and months in the file).
     const before = new Map<string, Record<string, unknown>>();
     const ids = [...new Set(good.map((r) => r.asset_id))];
     const periods = [...new Set(good.map((r) => r.period))];
-    for (let i = 0; i < ids.length; i += 100) {
-      const { data } = await supabase.from("oil_readings").select(["asset_id", "period", ...STORED_COLS.oil].join(","))
-        .in("asset_id", ids.slice(i, i + 100)).in("period", periods);
-      for (const o of (data ?? []) as unknown as Record<string, unknown>[]) before.set(batchKey(String(o.asset_id), String(o.period)), o);
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const old = await prisma.oilReading.findMany({
+        where: { asset_id: { in: ids.slice(i, i + CHUNK) }, period: { in: periods } },
+      });
+      for (const o of old)
+        before.set(batchKey(o.asset_id, o.period), o as unknown as Record<string, unknown>);
     }
 
     const groups = new Map<string, typeof good>();
     for (const r of good) {
-      const k = Object.keys(r).sort().join(",");
+      const k = Object.keys(r).sort().join(',');
       groups.set(k, [...(groups.get(k) ?? []), r]);
     }
     const saved: typeof good = [];
     for (const g of groups.values()) {
-      const { error } = await supabase.from("oil_readings").upsert(g, { onConflict: "asset_id,period" });
-      if (error) for (const r of g) fail(r.asset_id, r.period, error.message);
-      else saved.push(...g);
+      try {
+        await prisma.$transaction(
+          g.map(({ asset_id, period, ...cols }) =>
+            prisma.oilReading.upsert({
+              where: key(asset_id, period),
+              update: { ...cols, updated_by: auth.userId } as never,
+              create: { asset_id, period, ...cols, created_by: auth.userId } as never,
+            })
+          )
+        );
+        saved.push(...g);
+      } catch (e) {
+        // The DB error stays in the server log — its text (table/constraint names) never reaches the browser.
+        console.error('[saveOilBatch]', e);
+        for (const r of g) fail(r.asset_id, r.period, 'บันทึกไม่สำเร็จ — ลองใหม่ หรือแจ้งผู้ดูแลระบบ');
+      }
     }
 
     if (saved.length > 0) {
+      for (const id of new Set(saved.map((r) => r.asset_id))) await computeHealth(id);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        await supabase.from("audit_log").insert(saved.map(({ asset_id, period, ...cols }) => {
-          const old = before.get(batchKey(asset_id, period));
-          return {
-            user_id: user?.id ?? null,
-            action: "UPSERT",
-            table_name: "oil_readings",
-            record_id: `${asset_id}/${period}`,
-            old_value: old ? Object.fromEntries(Object.keys(cols).map((k) => [k, old[k] ?? null])) : null,
-            new_value: cols,
-          };
-        }));
+        await prisma.activityLog.createMany({
+          data: saved.map(({ asset_id, period, ...cols }) => {
+            const old = before.get(batchKey(asset_id, period));
+            return {
+              userId: auth.userId,
+              action: 'UPSERT',
+              tableName: 'oil_readings',
+              recordId: `${asset_id}/${period}`,
+              oldValue: old
+                ? JSON.stringify(
+                    Object.fromEntries(Object.keys(cols).map((k) => [k, old[k] ?? null]))
+                  )
+                : null,
+              newValue: JSON.stringify(cols),
+            };
+          }),
+        });
       } catch {
         // history must never block the save
       }
-      revalidatePath("/dashboard");
-      revalidatePath("/assets");
-      revalidatePath("/assets/[id]", "page");
+      revalidatePath('/dashboard');
+      revalidatePath('/assets');
+      revalidatePath('/assets/[id]', 'page');
     }
-    return { ok: failed.length === 0, saved: saved.length, failedKeys, failed, message: `บันทึก ${saved.length} รายการ` };
+    return {
+      ok: failed.length === 0,
+      saved: saved.length,
+      failedKeys,
+      failed,
+      message: `บันทึก ${saved.length} รายการ`,
+    };
   });
 }
 
 // "asset|period" pairs that already have an oil reading, so a lab-file import can
-// ask before it overwrites them (RLS-scoped like every read). null = the lookup failed:
+// ask before it overwrites them (plant-scoped like every read). null = the lookup failed:
 // the import must not go ahead as if nothing were saved.
-export async function getExistingOilKeys(assetIds: string[], periods: string[]): Promise<string[] | null> {
+export async function getExistingOilKeys(
+  assetIds: string[],
+  periods: string[]
+): Promise<string[] | null> {
   const ids = [...new Set(assetIds.filter(Boolean))];
-  const months = new Set(periods.filter(isPeriod));
-  if (ids.length === 0 || months.size === 0) return [];
-  if (isDemoMode()) {
-    return ids.flatMap((id) => getDemoOilHistory(id).filter((r) => months.has(r.period)).map((r) => batchKey(id, r.period)));
-  }
+  const months = [...new Set(periods.filter(isPeriod))];
+  if (ids.length === 0 || months.length === 0) return [];
   try {
-    const supabase = createClient();
+    const scope = { asset: await siteWhere() };
     const out: string[] = [];
-    for (let i = 0; i < ids.length; i += 100) {
-      const { data, error } = await supabase.from("oil_readings").select("asset_id,period").in("asset_id", ids.slice(i, i + 100)).in("period", [...months]);
-      if (error) return null;
-      for (const r of data ?? []) out.push(batchKey(r.asset_id as string, r.period as string));
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const rows = await prisma.oilReading.findMany({
+        where: { asset_id: { in: ids.slice(i, i + CHUNK) }, period: { in: months }, ...scope },
+        select: { asset_id: true, period: true },
+      });
+      for (const r of rows) out.push(batchKey(r.asset_id, r.period));
     }
     return out;
   } catch {

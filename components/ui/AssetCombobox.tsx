@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChevronDown, Search, X } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Search, X } from 'lucide-react';
 
 const MAX_RESULTS = 50;
 
@@ -11,9 +11,9 @@ export function AssetCombobox({
   assets,
   value,
   onChange,
-  placeholder = "ค้นหารหัสหรือชื่อเครื่องจักร...",
+  placeholder = 'ค้นหารหัสหรือชื่อเครื่องจักร...',
   ariaLabel,
-  className = "",
+  className = '',
 }: {
   assets: { id: string; name: string; site?: string }[];
   value: string;
@@ -25,7 +25,7 @@ export function AssetCombobox({
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
   const selected = assets.find((a) => a.id === value) ?? null;
 
@@ -36,7 +36,9 @@ export function AssetCombobox({
   }, [assets, q]);
   const total = useMemo(() => {
     const ql = q.trim().toLowerCase();
-    return ql ? assets.filter((a) => `${a.id} ${a.name}`.toLowerCase().includes(ql)).length : assets.length;
+    return ql
+      ? assets.filter((a) => `${a.id} ${a.name}`.toLowerCase().includes(ql)).length
+      : assets.length;
   }, [assets, q]);
 
   useEffect(() => {
@@ -44,35 +46,38 @@ export function AssetCombobox({
     function onDoc(e: MouseEvent) {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
   function pick(id: string) {
     onChange(id);
     setOpen(false);
-    setQ("");
+    setQ('');
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
       setOpen(true);
       setActive((i) => Math.min(i + 1, matches.length - 1));
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActive((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && open && matches[active]) {
+    } else if (e.key === 'Enter' && open && matches[active]) {
       e.preventDefault();
       pick(matches[active].id);
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       setOpen(false);
     }
   }
 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-t3" aria-hidden />
+      <Search
+        className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-t3"
+        aria-hidden
+      />
       <input
         role="combobox"
         aria-label={ariaLabel}
@@ -80,23 +85,39 @@ export function AssetCombobox({
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={open && matches[active] ? `${listId}-${active}` : undefined}
-        value={open ? q : selected ? `${selected.id} · ${selected.name}` : ""}
+        value={open ? q : selected ? `${selected.id} · ${selected.name}` : ''}
         placeholder={placeholder}
-        onFocus={() => { setOpen(true); setActive(0); }}
-        onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0); }}
+        onFocus={() => {
+          setOpen(true);
+          setActive(0);
+        }}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+          setActive(0);
+        }}
         onKeyDown={onKeyDown}
-        className="w-full rounded-lg border border-border bg-bg2 py-1.5 pl-8 pr-14 text-[14px] outline-none focus:border-cyan"
+        className="w-full rounded-lg border border-border bg-bg2 py-1.5 pr-14 pl-8 text-[14px] outline-hidden focus:border-cyan"
       />
-      <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 text-t3">
+      <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1 text-t3">
         {selected && !open && (
-          <button type="button" aria-label="ล้างการเลือก" onClick={() => pick("")} className="rounded p-0.5 hover:text-t1">
+          <button
+            type="button"
+            aria-label="ล้างการเลือก"
+            onClick={() => pick('')}
+            className="rounded-sm p-0.5 hover:text-t1"
+          >
             <X className="h-3.5 w-3.5" aria-hidden />
           </button>
         )}
         <ChevronDown className="h-3.5 w-3.5" aria-hidden />
       </div>
       {open && (
-        <ul id={listId} role="listbox" className="absolute z-50 mt-1 max-h-[280px] w-full overflow-y-auto rounded-lg border border-border bg-bg2 py-1 shadow-lg">
+        <ul
+          id={listId}
+          role="listbox"
+          className="absolute z-50 mt-1 max-h-[280px] w-full overflow-y-auto rounded-lg border border-border bg-bg2 py-1 shadow-lg"
+        >
           {matches.length === 0 ? (
             <li className="px-3 py-2 text-[13px] text-t3">ไม่พบเครื่องจักร</li>
           ) : (
@@ -106,19 +127,25 @@ export function AssetCombobox({
                 id={`${listId}-${i}`}
                 role="option"
                 aria-selected={a.id === value}
-                onMouseDown={(e) => { e.preventDefault(); pick(a.id); }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(a.id);
+                }}
                 onMouseEnter={() => setActive(i)}
-                className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-[14px] ${i === active ? "bg-cyan/10" : ""}`}
+                className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-[14px] ${i === active ? 'bg-cyan/10' : ''}`}
               >
                 <span className="min-w-0 truncate">
-                  <span className="font-mono font-semibold text-cyan">{a.id}</span> <span className="text-t2">{a.name}</span>
+                  <span className="font-mono font-semibold text-cyan">{a.id}</span>{' '}
+                  <span className="text-t2">{a.name}</span>
                 </span>
-                {a.site && <span className="flex-shrink-0 font-mono text-[13px] text-t3">{a.site}</span>}
+                {a.site && <span className="shrink-0 font-mono text-[13px] text-t3">{a.site}</span>}
               </li>
             ))
           )}
           {total > matches.length && (
-            <li className="border-t border-border px-3 py-1.5 text-[13px] text-t3">แสดง {matches.length} จาก {total} รายการ — พิมพ์เพิ่มเพื่อค้นหาให้แคบลง</li>
+            <li className="border-t border-border px-3 py-1.5 text-[13px] text-t3">
+              แสดง {matches.length} จาก {total} รายการ — พิมพ์เพิ่มเพื่อค้นหาให้แคบลง
+            </li>
           )}
         </ul>
       )}

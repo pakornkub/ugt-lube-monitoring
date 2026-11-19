@@ -3,9 +3,30 @@
 // row instead of guessing a month (the old code silently fell back to 2026-06).
 
 const MONTHS: Record<string, number> = {
-  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-  "ม.ค.": 1, "ก.พ.": 2, "มี.ค.": 3, "เม.ย.": 4, "พ.ค.": 5, "มิ.ย.": 6,
-  "ก.ค.": 7, "ส.ค.": 8, "ก.ย.": 9, "ต.ค.": 10, "พ.ย.": 11, "ธ.ค.": 12,
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12,
+  'ม.ค.': 1,
+  'ก.พ.': 2,
+  'มี.ค.': 3,
+  'เม.ย.': 4,
+  'พ.ค.': 5,
+  'มิ.ย.': 6,
+  'ก.ค.': 7,
+  'ส.ค.': 8,
+  'ก.ย.': 9,
+  'ต.ค.': 10,
+  'พ.ย.': 11,
+  'ธ.ค.': 12,
 };
 
 export function isPeriod(s: string): boolean {
@@ -27,7 +48,7 @@ function year(y: number): number | null {
 
 function out(y: number | null, m: number, ambiguous = false): ParsedPeriod | null {
   if (y == null || !Number.isInteger(m) || m < 1 || m > 12) return null;
-  const period = `${y}-${String(m).padStart(2, "0")}`;
+  const period = `${y}-${String(m).padStart(2, '0')}`;
   return isFuturePeriod(period) ? null : { period, ambiguous };
 }
 
@@ -36,12 +57,12 @@ function out(y: number | null, m: number, ambiguous = false): ParsedPeriod | nul
 export function isFuturePeriod(period: string): boolean {
   const now = new Date();
   const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return period > `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+  return period > `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export function parseSamplingPeriod(raw: string | null | undefined): ParsedPeriod | null {
-  const s = String(raw ?? "").trim();
-  if (!s || s === "-") return null;
+  const s = String(raw ?? '').trim();
+  if (!s || s === '-') return null;
 
   // Excel serial day number (cell exported without its date format)
   if (/^\d{5}(\.\d+)?$/.test(s)) {
@@ -51,7 +72,7 @@ export function parseSamplingPeriod(raw: string | null | undefined): ParsedPerio
 
   // Month written as a word: 15-Jun-26, Jun 2026, 15 มิ.ย. 2569
   // Drop a time first ("09:05", "10.20 น."): "15-Jun-26 09:05" must not read "05" as the year.
-  const t = s.replace(/(?<![\d.])\d{1,2}[:.]\d{2}(?:[:.]\d{2})?(?!\d)(?:\s*น\.)?/g, " ");
+  const t = s.replace(/(?<![\d.])\d{1,2}[:.]\d{2}(?:[:.]\d{2})?(?!\d)(?:\s*น\.)?/g, ' ');
   const lower = t.toLowerCase();
   for (const [name, m] of Object.entries(MONTHS)) {
     const at = lower.indexOf(name);
@@ -70,7 +91,9 @@ export function parseSamplingPeriod(raw: string | null | undefined): ParsedPerio
 
   const n = s.match(/(\d{1,4})[/\-.](\d{1,4})(?:[/\-.](\d{1,4}))?/);
   if (!n) return null;
-  const a = Number(n[1]), b = Number(n[2]), c = n[3] != null ? Number(n[3]) : null;
+  const a = Number(n[1]),
+    b = Number(n[2]),
+    c = n[3] != null ? Number(n[3]) : null;
 
   if (n[1].length === 4) return out(year(a), b); // 2026-06-15 / 2026-06
   if (c == null) return n[2].length >= 2 && b > 12 ? out(year(b), a) : null; // 06/2026 ("15/06" alone has no year)

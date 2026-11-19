@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const DiagnoseResultSchema = z.object({
   summary: z.string(),
@@ -39,7 +39,7 @@ export interface DiagnoseContext {
 }
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
@@ -56,14 +56,14 @@ export function buildPrompt(ctx: DiagnoseContext): string {
   return [
     `คุณคือ Chief Predictive Maintenance Reliability Officer ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น`,
     `เครื่องจักร: ${ctx.asset.name} (${ctx.asset.type}) | โรงงาน: ${ctx.asset.site} | Health: ${ctx.asset.health}% | Status: ${ctx.asset.status}`,
-    `Fe: ${o.fe ?? "N/A"} ppm | Viscosity: ${o.visc ?? "N/A"} cSt | Water: ${o.water ?? "N/A"} ppm | TAN: ${o.tan ?? "N/A"} | ISO: ${o.iso_code ?? "N/A"}`,
-    `Velocity RMS: ${v.vel ?? "N/A"} mm/s | Peak Accel: ${v.acc ?? "N/A"} g-PK | Bearing Temp: ${v.temp ?? "N/A"}°C`,
+    `Fe: ${o.fe ?? 'N/A'} ppm | Viscosity: ${o.visc ?? 'N/A'} cSt | Water: ${o.water ?? 'N/A'} ppm | TAN: ${o.tan ?? 'N/A'} | ISO: ${o.iso_code ?? 'N/A'}`,
+    `Velocity RMS: ${v.vel ?? 'N/A'} mm/s | Peak Accel: ${v.acc ?? 'N/A'} g-PK | Bearing Temp: ${v.temp ?? 'N/A'}°C`,
     `Output JSON: {"summary":"...","primaryAnomaly":"...","confidencePct":85,"oilAnalysis":"...","vibrationAnalysis":"...","rootCauseHypothesis":"...","actionPlan":{"immediate":["..."],"shortTerm":["..."],"longTerm":["..."]}}`,
-  ].join("\n");
+  ].join('\n');
 }
 
 export function parseDiagnose(text: string): DiagnoseResult {
-  const cleaned = text.replace(/```json|```/g, "").trim();
+  const cleaned = text.replace(/```json|```/g, '').trim();
   const obj = JSON.parse(cleaned);
   return DiagnoseResultSchema.parse(obj);
 }

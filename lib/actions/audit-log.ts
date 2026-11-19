@@ -1,10 +1,10 @@
-"use server";
+'use server';
 
-import { createClient } from "@/lib/supabase/server";
-import { isDemoMode, isLocalStore } from "@/lib/env";
-import { appendLocalAudit } from "@/lib/local-store";
+import { prisma } from '@/lib/prisma';
+import { getSessionUser } from '@/lib/profile';
 
-// Insert audit log entry — call after any data mutation
+// Insert an audit entry (ActivityLogs) — call after any data mutation. Never throws:
+// a failed audit write must not undo or block the change the user just made.
 export async function logAudit(opts: {
   action: string;
   table_name: string;
@@ -12,25 +12,17 @@ export async function logAudit(opts: {
   old_value?: Record<string, unknown>;
   new_value?: Record<string, unknown>;
 }): Promise<void> {
-  if (isLocalStore()) {
-    try {
-      appendLocalAudit({ action: opts.action, table_name: opts.table_name, record_id: opts.record_id ?? null, old_value: opts.old_value ?? null, new_value: opts.new_value ?? null });
-    } catch {
-      // history must never block the save
-    }
-    return;
-  }
-  if (isDemoMode()) return; // skip in demo
   try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("audit_log").insert({
-      user_id: user?.id ?? null,
-      action: opts.action,
-      table_name: opts.table_name,
-      record_id: opts.record_id ?? null,
-      old_value: opts.old_value ?? null,
-      new_value: opts.new_value ?? null,
+    const user = await getSessionUser();
+    await prisma.activityLog.create({
+      data: {
+        userId: user?.id ?? 'system',
+        action: opts.action,
+        tableName: opts.table_name,
+        recordId: opts.record_id?.slice(0, 200) ?? null, // RecordId is NVarChar(200)
+        oldValue: opts.old_value ? JSON.stringify(opts.old_value) : null,
+        newValue: opts.new_value ? JSON.stringify(opts.new_value) : null,
+      },
     });
   } catch {
     // audit log failure should never block the main operation

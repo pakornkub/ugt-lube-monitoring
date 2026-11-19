@@ -1,102 +1,101 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
-import { isDemoMode } from "@/lib/env";
-import { getDemoOilHistory, getDemoVibHistory } from "@/lib/demo-data";
-import type { OilReading, VibReading } from "@/lib/types";
+import { prisma } from '@/lib/prisma';
+import { siteWhere } from '@/lib/queries/permissions';
+import type { OilReading, VibReading } from '@/lib/types';
 
-// Latest readings for an asset. `supabase`: the cron's service-role client (no user session).
-export async function getLatestReadings(assetId: string, supabase?: SupabaseClient): Promise<{
+export const OIL_SELECT = {
+  period: true,
+  fe: true,
+  cu: true,
+  si: true,
+  water: true,
+  visc: true,
+  tan: true,
+  iso_code: true,
+  particle_4: true,
+  particle_6: true,
+  particle_14: true,
+} as const;
+export const VIB_SELECT = { period: true, vel: true, acc: true, cf: true, temp: true } as const;
+
+// SQL Server allows 2100 parameters per statement — id lists are read in chunks well under it.
+const CHUNK = 1000;
+
+// `unscoped`: the cron's digest (no user session); otherwise the user's plant scope applies.
+async function scope(unscoped: boolean) {
+  return unscoped ? {} : { asset: await siteWhere() };
+}
+
+// Latest readings for an asset.
+export async function getLatestReadings(
+  assetId: string,
+  unscoped = false
+): Promise<{
   oil: OilReading | null;
   vib: VibReading | null;
 }> {
-  if (isDemoMode()) {
-    const oil = getDemoOilHistory(assetId);
-    const vib = getDemoVibHistory(assetId);
-    return {
-      oil: oil.length ? oil[oil.length - 1] : null,
-      vib: vib.length ? vib[vib.length - 1] : null,
-    };
-  }
-  supabase ??= createClient();
-  const [oilRes, vibRes] = await Promise.all([
-    supabase
-      .from("oil_readings")
-      .select("period,fe,cu,si,water,visc,tan,iso_code,particle_4,particle_6,particle_14")
-      .eq("asset_id", assetId)
-      .order("period", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("vib_readings")
-      .select("period,vel,acc,cf,temp")
-      .eq("asset_id", assetId)
-      .order("period", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+  const where = { asset_id: assetId, ...(await scope(unscoped)) };
+  const [oil, vib] = await Promise.all([
+    prisma.oilReading.findFirst({ where, select: OIL_SELECT, orderBy: { period: 'desc' } }),
+    prisma.vibReading.findFirst({ where, select: VIB_SELECT, orderBy: { period: 'desc' } }),
   ]);
-  return {
-    oil: (oilRes.data as OilReading | null) ?? null,
-    vib: (vibRes.data as VibReading | null) ?? null,
-  };
+  return { oil, vib };
 }
 
-/** getLatestReadings for many assets in a few queries (10 assets each: a reply holds at most 1000 rows). */
+/** getLatestReadings for many assets in a few queries. */
 export async function getLatestReadingsMany(
   assetIds: string[],
-  supabase?: SupabaseClient,
+  unscoped = false
 ): Promise<Map<string, { oil: OilReading | null; vib: VibReading | null }>> {
   const out = new Map<string, { oil: OilReading | null; vib: VibReading | null }>();
   for (const id of assetIds) out.set(id, { oil: null, vib: null });
-  if (isDemoMode()) {
-    for (const id of assetIds) out.set(id, { oil: getDemoOilHistory(id).at(-1) ?? null, vib: getDemoVibHistory(id).at(-1) ?? null });
-    return out;
+  const sc = await scope(unscoped);
+  for (let i = 0; i < assetIds.length; i += CHUNK) {
+    const where = { asset_id: { in: assetIds.slice(i, i + CHUNK) }, ...sc };
+    // shortcut: reads each machine's whole history and keeps the newest — fine for monthly results
+    // on ~600 machines; switch to a groupBy(max period) when the history grows to years × thousands.
+    const [oil, vib] = await Promise.all([
+      prisma.oilReading.findMany({
+        where,
+        select: { asset_id: true, ...OIL_SELECT },
+        orderBy: { period: 'desc' },
+      }),
+      prisma.vibReading.findMany({
+        where,
+        select: { asset_id: true, ...VIB_SELECT },
+        orderBy: { period: 'desc' },
+      }),
+    ]);
+    // newest first: the first row seen for an asset is its latest
+    for (const { asset_id, ...r } of oil) {
+      const cur = out.get(asset_id);
+      if (cur && !cur.oil) cur.oil = r;
+    }
+    for (const { asset_id, ...r } of vib) {
+      const cur = out.get(asset_id);
+      if (cur && !cur.vib) cur.vib = r;
+    }
   }
-  supabase ??= createClient();
-  const db = supabase;
-  const chunks: string[][] = [];
-  // shortcut: rows come newest first, capped at 1000 per chunk — a machine whose latest result is older than
-  // ~1000 newer rows of the other 9 (about 8 years of monthly results) loses it; then switch to a latest-per-machine view.
-  for (let i = 0; i < assetIds.length; i += 10) chunks.push(assetIds.slice(i, i + 10));
-  await Promise.all(
-    chunks.flatMap((ids) => [
-      db.from("oil_readings").select("asset_id,period,fe,cu,si,water,visc,tan,iso_code,particle_4,particle_6,particle_14").in("asset_id", ids).order("period", { ascending: false }),
-      db.from("vib_readings").select("asset_id,period,vel,acc,cf,temp").in("asset_id", ids).order("period", { ascending: false }),
-    ]).map(async (q, i) => {
-      const { data, error } = await q;
-      if (error) throw new Error(error.message);
-      const kind = i % 2 === 0 ? "oil" : "vib";
-      // newest first: the first row seen for an asset is its latest
-      for (const row of (data ?? []) as ({ asset_id: string } & Record<string, unknown>)[]) {
-        const cur = out.get(row.asset_id);
-        if (cur && !cur[kind]) {
-          const { asset_id: _a, ...reading } = row;
-          cur[kind] = reading as never;
-        }
-      }
-    }),
-  );
   return out;
 }
 
 /**
  * Each machine's latest lab (oil) period, or no entry when it has none yet. assets.last_update
- * is not this: it holds the month the machine was added and saving a reading never moves it.
+ * is not this: it starts at the equipment list's date and only moves forward to the newest
+ * oil or vibration reading (lib/scoring/recompute.ts).
  */
-export async function getLatestLabPeriods(assetIds: string[], supabase?: SupabaseClient): Promise<Record<string, string>> {
+export async function getLatestLabPeriods(
+  assetIds: string[],
+  unscoped = false
+): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
-  if (!assetIds.length) return out;
-  if (isDemoMode()) {
-    for (const id of assetIds) {
-      const p = getDemoOilHistory(id).at(-1)?.period;
-      if (p) out[id] = p;
-    }
-    return out;
-  }
-  const db = supabase ?? createClient();
-  // 100 ids per request keeps the URL short when the weekly email lists hundreds of machines
-  for (let i = 0; i < assetIds.length; i += 100) {
-    const { data } = await db.from("latest_oil_readings").select("asset_id,period").in("asset_id", assetIds.slice(i, i + 100));
-    for (const r of data ?? []) out[r.asset_id as string] = r.period as string;
+  const sc = await scope(unscoped);
+  for (let i = 0; i < assetIds.length; i += CHUNK) {
+    const rows = await prisma.oilReading.groupBy({
+      by: ['asset_id'],
+      where: { asset_id: { in: assetIds.slice(i, i + CHUNK) }, ...sc },
+      _max: { period: true },
+    });
+    for (const r of rows) if (r._max.period) out[r.asset_id] = r._max.period;
   }
   return out;
 }
@@ -106,27 +105,10 @@ export async function getReadingsHistory(assetId: string): Promise<{
   oil: OilReading[];
   vib: VibReading[];
 }> {
-  if (isDemoMode()) {
-    return {
-      oil: getDemoOilHistory(assetId),
-      vib: getDemoVibHistory(assetId),
-    };
-  }
-  const supabase = createClient();
-  const [oilRes, vibRes] = await Promise.all([
-    supabase
-      .from("oil_readings")
-      .select("period,fe,cu,si,water,visc,tan,iso_code,particle_4,particle_6,particle_14")
-      .eq("asset_id", assetId)
-      .order("period", { ascending: true }),
-    supabase
-      .from("vib_readings")
-      .select("period,vel,acc,cf,temp")
-      .eq("asset_id", assetId)
-      .order("period", { ascending: true }),
+  const where = { asset_id: assetId, ...(await scope(false)) };
+  const [oil, vib] = await Promise.all([
+    prisma.oilReading.findMany({ where, select: OIL_SELECT, orderBy: { period: 'asc' } }),
+    prisma.vibReading.findMany({ where, select: VIB_SELECT, orderBy: { period: 'asc' } }),
   ]);
-  return {
-    oil: (oilRes.data as OilReading[]) ?? [],
-    vib: (vibRes.data as VibReading[]) ?? [],
-  };
+  return { oil, vib };
 }
